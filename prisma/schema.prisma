@@ -1,0 +1,141 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Document {
+  id        Int             @id @default(autoincrement())
+  title     String
+  fileUrl   String
+  fileType  String
+  createdAt DateTime        @default(now())
+  elements  CanvasElement[]
+}
+
+model CanvasElement {
+  id         String   @id @default(cuid())
+  documentId Int
+  type       String   @default("rect")
+  x          Float
+  y          Float
+  width      Float
+  height     Float
+  label      String?
+  fieldName  String?
+  fieldValue String?
+  script     String?  // NEW: Script/Condition name
+  formula    String?  // NEW: Calculation formula
+  fontSize   Int      @default(14)
+  alignment  String   @default("left") // "left", "center", "right"
+  pageNumber Int      @default(1)
+  rotation   Float    @default(0) // NEW: Rotation in degrees
+  metadata   Json?
+  document   Document @relation(fields: [documentId], references: [id])
+}
+
+// --- Metadata Configuration for Dynamic Procedures ---
+
+model DbConfigTable {
+  id            Int             @id @default(autoincrement())
+  tableName     String          // Display Name / Logical Name
+  procedureName String          // Stored Procedure or Table Name for query
+  fields        DbConfigField[]
+  params        DbConfigParam[]
+
+  @@map("db_config_tables")
+}
+
+model DbConfigField {
+  id        Int           @id @default(autoincrement())
+  tableId   Int
+  fieldName String        // Column name in result set
+  label     String?       // Display label for UI
+  table     DbConfigTable @relation(fields: [tableId], references: [id], onDelete: Cascade)
+
+  @@map("db_config_fields")
+}
+
+model DbConfigParam {
+  id        Int           @id @default(autoincrement())
+  tableId   Int
+  paramName String        // Parameter name matching JSON input
+  seq       Int           // Sequence order for SP arguments
+  table     DbConfigTable @relation(fields: [tableId], references: [id], onDelete: Cascade)
+
+  @@map("db_config_params")
+}
+
+// --- จ้อมูลโรงพยาบาล (Hospital Data Models) ---
+
+model Patient {
+  hn           String         @id
+  firstName    String?        @map("first_name")
+  lastName     String?        @map("last_name")
+  gender       String?        // NEW: Male/Female/Other
+  phone        String?        // NEW: Contact number
+  address      String?        // NEW: Patient address
+  dob          DateTime?      @db.Date
+  bloodGroup   String?        @map("blood_group") // NEW: A, B, AB, O etc.
+  idCard       String?        @map("id_card")
+  allergies    String?
+  image        String?        // NEW: Patient Image URL
+  prescriptions Prescription[]
+  labResults   LabResult[]
+
+
+  @@map("patients")
+}
+
+model Drug {
+  code             String             @id
+  name             String?
+  tradeName        String?            @map("trade_name")
+  dosage           String?
+  usage            String?
+  unit             String?            // NEW: mg, tab, capsule, ml
+  category         String?            // NEW: Antibiotic, Analgesic, etc.
+  price            Decimal?           @db.Decimal(10, 2)
+  prescriptionItems PrescriptionItem[]
+
+  @@map("drugs")
+}
+
+model Prescription {
+  rxNo       String             @id @map("rx_no")
+  date       DateTime           @default(now())
+  doctorName String?            @map("doctor_name")
+  totalAmount Decimal?           @db.Decimal(10, 2) @map("total_amount") // NEW: Total billable amount
+  patientHn  String?            @map("patient_hn")
+  patient    Patient?           @relation(fields: [patientHn], references: [hn], onDelete: Cascade)
+  items      PrescriptionItem[]
+
+  @@map("prescriptions")
+}
+
+model PrescriptionItem {
+  id           Int          @id @default(autoincrement())
+  rxNo         String?      @map("rx_no")
+  drugCode     String?      @map("drug_code")
+  qty          Int?
+  amount       Decimal?     @db.Decimal(10, 2)
+  prescription Prescription? @relation(fields: [rxNo], references: [rxNo], onDelete: Cascade)
+  drug         Drug?        @relation(fields: [drugCode], references: [code], onDelete: Restrict)
+
+  @@map("prescription_items")
+}
+
+model LabResult {
+  id           Int      @id @default(autoincrement())
+  patientHn    String   @map("patient_hn")
+  testName     String   @map("test_name") // e.g., "Hct", "Hb"
+  value        String
+  unit         String?
+  date         DateTime @default(now())
+  patient      Patient  @relation(fields: [patientHn], references: [hn], onDelete: Cascade)
+
+  @@map("lab_results")
+}
