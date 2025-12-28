@@ -1,7 +1,7 @@
 export type ElementType = "text" | "qr" | "image" | "table" | "signature";
 
 export interface CanvasElement {
-    id: string;
+    id: string | number;
     type: ElementType;
     x: number;
     y: number;
@@ -9,6 +9,8 @@ export interface CanvasElement {
     height: number;
     label?: string;
     fieldName?: string;
+    dbConfigTableId?: number;
+    dbConfigFieldId?: number;
     fieldValue?: string;
     script?: string;
     formula?: string;

@@ -46,6 +46,7 @@ export default async function EditorPage({ params }: { params: Promise<{ id: str
                 <CanvasEditor
                     documentId={idStr}
                     fileUrl={document.fileUrl}
+                    fileType={document.fileType}
                     initialElements={initialElements}
                 />
             </div>

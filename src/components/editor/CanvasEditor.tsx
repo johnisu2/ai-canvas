@@ -18,6 +18,7 @@ import { Toolbox } from "./Toolbox";
 import { EditModal } from "./EditModal";
 import { v4 as uuidv4 } from "uuid";
 import { ElementType } from "@/types/canvas";
+import { ElementRenderer } from "./ElementRenderer";
 
 // Configure worker
 if (typeof window !== "undefined") {
@@ -27,16 +28,17 @@ if (typeof window !== "undefined") {
 interface CanvasEditorProps {
     documentId: string;
     fileUrl: string;
+    fileType?: string; // NEW
     initialElements?: CanvasElement[];
 }
 
-export function CanvasEditor({ documentId, fileUrl, initialElements = [] }: CanvasEditorProps) {
+export function CanvasEditor({ documentId, fileUrl, fileType = 'pdf', initialElements = [] }: CanvasEditorProps) {
     const [pdfDocument, setPdfDocument] = useState<PDFDocumentProxy | null>(null);
     const [elements, setElements] = useState<CanvasElement[]>(initialElements);
     const [scale, setScale] = useState(1.0);
     const [showGrid, setShowGrid] = useState(false);
-    const [selectedElementId, setSelectedElementId] = useState<string | null>(null);
-    const [editingElementId, setEditingElementId] = useState<string | null>(null);
+    const [selectedElementId, setSelectedElementId] = useState<string | number | null>(null);
+    const [editingElementId, setEditingElementId] = useState<string | number | null>(null);
     const [isGenerateOpen, setIsGenerateOpen] = useState(false);
     const [isDirty, setIsDirty] = useState(false);
     const [isLoading, setIsLoading] = useState(true);
@@ -62,12 +64,12 @@ export function CanvasEditor({ documentId, fileUrl, initialElements = [] }: Canv
         setIsDirty(true);
     };
 
-    const handleUpdateElement = (id: string, updates: Partial<CanvasElement>) => {
+    const handleUpdateElement = (id: string | number, updates: Partial<CanvasElement>) => {
         setElements((prev) => prev.map((el) => (el.id === id ? { ...el, ...updates } : el)));
         setIsDirty(true);
     };
 
-    const handleDeleteElement = (id: string) => {
+    const handleDeleteElement = (id: string | number) => {
         if (!confirm("คุณต้องการลบองค์ประกอบนี้ใช่หรือไม่?")) return;
         setElements((prev) => prev.filter((el) => el.id !== id));
         if (selectedElementId === id) setSelectedElementId(null);
@@ -95,6 +97,11 @@ export function CanvasEditor({ documentId, fileUrl, initialElements = [] }: Canv
 
     useEffect(() => {
         const loadPdf = async () => {
+            if (fileType !== 'pdf') {
+                setIsLoading(false);
+                return;
+            }
+
             try {
                 setIsLoading(true);
                 const loadingTask = pdfjsLib.getDocument(fileUrl);
@@ -111,7 +118,7 @@ export function CanvasEditor({ documentId, fileUrl, initialElements = [] }: Canv
         if (fileUrl) {
             loadPdf();
         }
-    }, [fileUrl]);
+    }, [fileUrl, fileType]);
 
     if (isLoading) {
         return (
@@ -121,10 +128,10 @@ export function CanvasEditor({ documentId, fileUrl, initialElements = [] }: Canv
         );
     }
 
-    if (error || !pdfDocument) {
+    if (error || (fileType === 'pdf' && !pdfDocument)) {
         return (
             <div className="flex items-center justify-center h-full text-red-500">
-                {error || "Document not found"}
+                {error || "Document not found/loading failed"}
             </div>
         );
     }
@@ -181,25 +188,87 @@ export function CanvasEditor({ documentId, fileUrl, initialElements = [] }: Canv
                 </button>
             </div>
 
-            {pdfDocument && Array.from({ length: pdfDocument.numPages }, (_, index) => (
-                <PDFPage
-                    key={index + 1}
-                    pageNumber={index + 1}
-                    pdfDocument={pdfDocument}
-                    scale={scale}
-                    showGrid={showGrid}
-                    elements={elements.filter((el) => el.pageNumber === index + 1)}
-                    selectedElementId={selectedElementId}
-                    onAddElement={(type: ElementType, x: number, y: number) => handleAddElement(index + 1, type, x, y)}
-                    onUpdateElement={handleUpdateElement}
-                    onSelectElement={setSelectedElementId}
-                    onEditElement={(id: string) => {
-                        setEditingElementId(id);
-                        setSelectedElementId(id);
+            {/* Content Rendering */}
+            {fileType === 'pdf' && pdfDocument ? (
+                Array.from({ length: pdfDocument.numPages }, (_, index) => (
+                    <PDFPage
+                        key={index + 1}
+                        pageNumber={index + 1}
+                        pdfDocument={pdfDocument}
+                        scale={scale}
+                        showGrid={showGrid}
+                        elements={elements.filter((el) => el.pageNumber === index + 1)}
+                        selectedElementId={selectedElementId}
+                        onAddElement={(type: ElementType, x: number, y: number) => handleAddElement(index + 1, type, x, y)}
+                        onUpdateElement={handleUpdateElement}
+                        onSelectElement={setSelectedElementId}
+                        onEditElement={(id: string | number) => {
+                            setEditingElementId(id);
+                            setSelectedElementId(id);
+                        }}
+                        onDeleteElement={handleDeleteElement}
+                    />
+                ))
+            ) : fileType !== 'pdf' ? (
+                // Image / Other Rendering
+                <div
+                    className="relative shadow-lg bg-white transition-all duration-200 ease-in-out mb-8"
+                    style={{
+                        width: '800px', // Default width, maybe adjust or make responsive to image?
+                        minHeight: '1100px', // Default height
+                        transform: `scale(${scale})`, // Use scale here if not passing down
+                        transformOrigin: 'top center'
                     }}
-                    onDeleteElement={handleDeleteElement}
-                />
-            ))}
+                    onDrop={(e) => {
+                        e.preventDefault();
+                        const type = e.dataTransfer.getData("elementType") as ElementType;
+                        if (type) {
+                            const rect = e.currentTarget.getBoundingClientRect();
+                            const x = (e.clientX - rect.left) / scale;
+                            const y = (e.clientY - rect.top) / scale;
+                            handleAddElement(1, type, x, y);
+                        }
+                    }}
+                    onDragOver={(e) => e.preventDefault()}
+                >
+                    {/* Background Image */}
+                    <img
+                        src={fileUrl}
+                        alt="Document"
+                        className="absolute inset-0 w-full h-full object-contain pointer-events-none"
+                        onLoad={(e) => {
+                            // Optional: adjust dimensions to match image natural size?
+                            // For now, object-contain in fixed frame or just let it fill
+                        }}
+                    />
+
+                    {/* Grid Layer */}
+                    {showGrid && (
+                        <div className="absolute inset-0 pointer-events-none opacity-20 z-10"
+                            style={{ backgroundImage: `radial-gradient(circle, #6366f1 1px, transparent 1px)`, backgroundSize: `${20}px ${20}px` }}> {/* Fixed 20px grid since we scale container */}
+                        </div>
+                    )}
+
+                    {/* Elements Layer */}
+                    <div className="absolute inset-0">
+                        {elements.map((el) => (
+                            <ElementRenderer
+                                key={el.id}
+                                element={el}
+                                scale={1} // Scale handled by parent transform
+                                isSelected={selectedElementId === el.id}
+                                onUpdate={handleUpdateElement}
+                                onSelect={setSelectedElementId}
+                                onEdit={(id: string | number) => {
+                                    setEditingElementId(id);
+                                    setSelectedElementId(id);
+                                }}
+                                onDelete={handleDeleteElement}
+                            />
+                        ))}
+                    </div>
+                </div>
+            ) : null}
 
             {editingElementId && (
                 <EditModal

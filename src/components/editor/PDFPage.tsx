@@ -12,12 +12,12 @@ interface PDFPageProps {
     scale: number;
     showGrid: boolean;
     elements: CanvasElement[];
-    selectedElementId: string | null;
+    selectedElementId: string | number | null;
     onAddElement: (type: ElementType, x: number, y: number) => void;
-    onUpdateElement: (id: string, updates: Partial<CanvasElement>) => void;
-    onSelectElement: (id: string) => void;
-    onEditElement: (id: string) => void;
-    onDeleteElement: (id: string) => void;
+    onUpdateElement: (id: string | number, updates: Partial<CanvasElement>) => void;
+    onSelectElement: (id: string | number) => void;
+    onEditElement: (id: string | number) => void;
+    onDeleteElement: (id: string | number) => void;
 }
 
 export function PDFPage({

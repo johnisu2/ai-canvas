@@ -13,7 +13,6 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
             prisma.canvasElement.deleteMany({ where: { documentId: id } }),
             prisma.canvasElement.createMany({
                 data: elements.map((el: any) => ({
-                    id: el.id,
                     documentId: id,
                     type: el.type,
                     x: el.x,
@@ -22,12 +21,15 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
                     height: el.height,
                     label: el.label,
                     fieldName: el.fieldName,
+                    dbConfigTableId: el.dbConfigTableId,
+                    dbConfigFieldId: el.dbConfigFieldId,
                     fieldValue: el.fieldValue,
                     script: el.script,
                     formula: el.formula,
                     fontSize: el.fontSize,
                     alignment: el.alignment,
                     pageNumber: el.pageNumber,
+                    rotation: el.rotation || 0,
                     metadata: el.metadata || undefined
                 }))
             })

@@ -22,7 +22,7 @@ export async function POST(request: NextRequest) {
         if (!doc) return NextResponse.json({ error: "Document not found" }, { status: 404 });
 
         // Map Prisma elements to CanvasElement
-        const elements: CanvasElement[] = doc.elements.map(el => ({
+        const elements: CanvasElement[] = doc.elements.map((el: any) => ({
             id: el.id,
             type: el.type as any,
             x: el.x,
@@ -31,12 +31,15 @@ export async function POST(request: NextRequest) {
             height: el.height,
             label: el.label || undefined,
             fieldName: el.fieldName || undefined,
+            dbConfigTableId: el.dbConfigTableId || undefined,
+            dbConfigFieldId: el.dbConfigFieldId || undefined,
             fieldValue: el.fieldValue || undefined,
             script: el.script || undefined,
             formula: el.formula || undefined,
             fontSize: el.fontSize,
             alignment: el.alignment as any,
             pageNumber: el.pageNumber,
+            rotation: el.rotation || 0,
             metadata: el.metadata || undefined
         }));
 

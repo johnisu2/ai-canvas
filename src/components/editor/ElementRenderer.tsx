@@ -18,10 +18,10 @@ interface ElementRendererProps {
     element: CanvasElement;
     scale: number;
     isSelected: boolean;
-    onUpdate: (id: string, updates: Partial<CanvasElement>) => void;
-    onSelect: (id: string) => void;
-    onEdit: (id: string) => void;
-    onDelete: (id: string) => void;
+    onUpdate: (id: string | number, updates: Partial<CanvasElement>) => void;
+    onSelect: (id: string | number) => void;
+    onEdit: (id: string | number) => void;
+    onDelete: (id: string | number) => void;
 }
 
 const colorMap: Record<ElementType, string> = {

@@ -22,9 +22,9 @@ interface EditModalProps {
     element: CanvasElement;
     isOpen: boolean;
     onClose: () => void;
-    onSave: (id: string, updates: Partial<CanvasElement>) => void;
-    onChange?: (id: string, updates: Partial<CanvasElement>) => void; // Added for Live Preview
-    onDelete: (id: string) => void;
+    onSave: (id: string | number, updates: Partial<CanvasElement>) => void;
+    onChange?: (id: string | number, updates: Partial<CanvasElement>) => void; // Added for Live Preview
+    onDelete: (id: string | number) => void;
 }
 
 export function EditModal({ element, isOpen, onClose, onSave, onChange, onDelete }: EditModalProps) {
@@ -55,7 +55,16 @@ export function EditModal({ element, isOpen, onClose, onSave, onChange, onDelete
                 const data = await res.json();
                 setTables(data);
 
-                // Set initial selection based on element.fieldName
+                // Priority 1: Use direct IDs if available
+                if (element.dbConfigTableId) {
+                    setSelectedTableId(element.dbConfigTableId);
+                    if (element.dbConfigFieldId) {
+                        setSelectedFieldId(element.dbConfigFieldId);
+                    }
+                    return;
+                }
+
+                // Priority 2: Fallback to fieldName parts (legacy/backwards compatibility)
                 if (element.fieldName) {
                     const parts = element.fieldName.split('.');
                     if (parts.length >= 2) {
@@ -99,17 +108,44 @@ export function EditModal({ element, isOpen, onClose, onSave, onChange, onDelete
         if (isNaN(tableId)) {
             setSelectedTableId("");
             setSelectedFieldId("");
-            handleChange("fieldName", "");
+            setFormData(prev => ({
+                ...prev,
+                fieldName: "",
+                dbConfigTableId: undefined,
+                dbConfigFieldId: undefined
+            }));
+            if (onChange) onChange(element.id, { fieldName: "", dbConfigTableId: null as any, dbConfigFieldId: null as any });
             return;
         }
+
         setSelectedTableId(tableId);
         setSelectedFieldId("");
 
         const table = tables.find(t => t.id === tableId);
         if (table && element.type === 'table') {
-            handleChange("fieldName", table.tableName);
+            // For tables, the table itself is the target
+            setFormData(prev => ({
+                ...prev,
+                fieldName: table.tableName,
+                dbConfigTableId: tableId,
+                dbConfigFieldId: undefined
+            }));
+            if (onChange) onChange(element.id, {
+                fieldName: table.tableName,
+                dbConfigTableId: tableId,
+                dbConfigFieldId: null as any
+            });
         } else {
-            handleChange("fieldName", "");
+            // For others, we wait for field selection
+            setFormData(prev => ({
+                ...prev,
+                dbConfigTableId: tableId,
+                dbConfigFieldId: undefined
+            }));
+            if (onChange) onChange(element.id, {
+                dbConfigTableId: tableId,
+                dbConfigFieldId: null as any
+            });
         }
     };
 
@@ -117,6 +153,8 @@ export function EditModal({ element, isOpen, onClose, onSave, onChange, onDelete
         const fieldId = parseInt(e.target.value);
         if (isNaN(fieldId)) {
             setSelectedFieldId("");
+            setFormData(prev => ({ ...prev, dbConfigFieldId: undefined, fieldName: "" }));
+            if (onChange) onChange(element.id, { dbConfigFieldId: null as any, fieldName: "" });
             return;
         }
         setSelectedFieldId(fieldId);
@@ -125,9 +163,18 @@ export function EditModal({ element, isOpen, onClose, onSave, onChange, onDelete
         const field = table?.fields.find(f => f.id === fieldId);
 
         if (table && field) {
-            // Save as 'TableName.FieldName'
             const mapping = `${table.tableName}.${field.fieldName}`;
-            handleChange("fieldName", mapping);
+            setFormData(prev => ({
+                ...prev,
+                fieldName: mapping,
+                dbConfigTableId: table.id,
+                dbConfigFieldId: field.id
+            }));
+            if (onChange) onChange(element.id, {
+                fieldName: mapping,
+                dbConfigTableId: table.id,
+                dbConfigFieldId: field.id
+            });
         }
     };
 
@@ -361,10 +408,16 @@ export function EditModal({ element, isOpen, onClose, onSave, onChange, onDelete
                                     </div>
                                     <div className="col-span-5">
                                         <select
-                                            value={col.field}
+                                            value={col.fieldId || col.field}
                                             onChange={e => {
+                                                const fieldId = parseInt(e.target.value);
+                                                const fieldObj = activeFields.find(f => f.id === fieldId);
                                                 const newCols = [...(formData.metadata as any)];
-                                                newCols[idx] = { ...col, field: e.target.value };
+                                                newCols[idx] = {
+                                                    ...col,
+                                                    field: fieldObj?.fieldName || e.target.value,
+                                                    fieldId: isNaN(fieldId) ? undefined : fieldId
+                                                };
                                                 handleChange("metadata", newCols);
                                             }}
                                             disabled={!selectedTableId}
@@ -372,7 +425,7 @@ export function EditModal({ element, isOpen, onClose, onSave, onChange, onDelete
                                         >
                                             <option value="">-- เลือกฟิลด์ --</option>
                                             {activeFields.map(f => (
-                                                <option key={f.id} value={f.fieldName}>{f.label || f.fieldName}</option>
+                                                <option key={f.id} value={f.id}>{f.label || f.fieldName}</option>
                                             ))}
                                         </select>
                                     </div>

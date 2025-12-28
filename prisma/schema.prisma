@@ -17,24 +17,26 @@ model Document {
 }
 
 model CanvasElement {
-  id         String   @id @default(cuid())
-  documentId Int
-  type       String   @default("rect")
-  x          Float
-  y          Float
-  width      Float
-  height     Float
-  label      String?
-  fieldName  String?
-  fieldValue String?
-  script     String?  // NEW: Script/Condition name
-  formula    String?  // NEW: Calculation formula
-  fontSize   Int      @default(14)
-  alignment  String   @default("left") // "left", "center", "right"
-  pageNumber Int      @default(1)
-  rotation   Float    @default(0) // NEW: Rotation in degrees
-  metadata   Json?
-  document   Document @relation(fields: [documentId], references: [id])
+  id               Int      @id @default(autoincrement())
+  documentId       Int
+  type             String   @default("rect")
+  x                Float
+  y                Float
+  width            Float
+  height           Float
+  label            String?
+  fieldName        String?
+  dbConfigTableId  Int?     // NEW: Mapping to database config table
+  dbConfigFieldId  Int?     // NEW: Mapping to database config field
+  fieldValue       String?
+  script           String?  // NEW: Script/Condition name
+  formula          String?  // NEW: Calculation formula
+  fontSize         Int      @default(14)
+  alignment        String   @default("left") // "left", "center", "right"
+  pageNumber       Int      @default(1)
+  rotation         Float    @default(0) // NEW: Rotation in degrees
+  metadata         Json?
+  document         Document @relation(fields: [documentId], references: [id])
 }
 
 // --- Metadata Configuration for Dynamic Procedures ---

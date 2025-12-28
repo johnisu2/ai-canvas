@@ -30,23 +30,19 @@ export async function generatePdf(
     const symbolsFont = await pdfDoc.embedFont(symbolsBytes, { subset: true });
 
     // Helper to draw text with font switching (Thai/EN/Symbols)
-    const drawRichText = (page: any, text: string, x: number, y: number, fontSize: number) => {
+    const drawRichText = (page: any, text: string, x: number, y: number, fontSize: number, rotation: number = 0) => {
         let currentX = x;
+        const rad = (rotation * Math.PI) / 180;
 
-        // Simple glyph detection logic
-        // Sarabun covers Thai (0E00-0E7F) and Latin/Common ASCII
-        // Noto Sans Symbols covers symbols like ✔ (2714)
         const getFontForChar = (char: string): PDFFont => {
             const code = char.charCodeAt(0);
-            // Basic Greek/Symbols/Arrows often in Symbols font
             if (code > 0x2000) return symbolsFont;
             return sarabunFont;
         };
 
-        // Group consecutive characters with the same font for efficiency
-        let segments: { text: string; font: PDFFont }[] = [];
         if (text.length === 0) return;
 
+        let segments: { text: string; font: PDFFont }[] = [];
         let currentSegment = { text: text[0], font: getFontForChar(text[0]) };
 
         for (let i = 1; i < text.length; i++) {
@@ -60,7 +56,6 @@ export async function generatePdf(
         }
         segments.push(currentSegment);
 
-        // Draw segments
         for (const segment of segments) {
             page.drawText(segment.text, {
                 x: currentX,
@@ -68,6 +63,7 @@ export async function generatePdf(
                 size: fontSize,
                 font: segment.font,
                 color: rgb(0, 0, 0),
+                rotate: radians(rotation)
             });
             currentX += segment.font.widthOfTextAtSize(segment.text, fontSize);
         }
@@ -215,7 +211,8 @@ export async function generatePdf(
                     resolvedValue || "",
                     x,
                     y - fontSize,
-                    fontSize
+                    fontSize,
+                    rotationDegrees
                 );
             } else if (element.type === "qr") {
                 const qrValue = resolvedValue || "";
