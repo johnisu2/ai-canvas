@@ -8,12 +8,50 @@ import { CanvasElement } from "@/types/canvas";
 export async function generatePdf(
     fileUrl: string,
     elements: CanvasElement[],
-    dataContext: any
+    dataContext: any,
+    fileType: string = 'pdf'
 ) {
-    // 1. Load PDF
+    // 1. Load PDF or Create New from Image
     const filePath = join(process.cwd(), "public", fileUrl);
-    const pdfBuffer = await readFile(filePath);
-    const pdfDoc = await PDFDocument.load(pdfBuffer);
+    const fileBuffer = await readFile(filePath);
+    let pdfDoc: PDFDocument;
+
+    const isPdf = fileType === 'pdf' || fileType.toLowerCase().includes('pdf');
+
+    if (isPdf) {
+        pdfDoc = await PDFDocument.load(fileBuffer);
+    } else {
+        // Assume Image (jpg, png)
+        pdfDoc = await PDFDocument.create();
+
+        let image;
+        let width, height;
+
+        try {
+            // Try embedding as PNG first, then JPG if fails (or check extension if available)
+            // Ideally check extension, but buffer check is robust enough for simple switch
+            try {
+                image = await pdfDoc.embedPng(fileBuffer);
+            } catch {
+                image = await pdfDoc.embedJpg(fileBuffer);
+            }
+
+            width = image.width;
+            height = image.height;
+
+            const page = pdfDoc.addPage([width, height]);
+            page.drawImage(image, {
+                x: 0,
+                y: 0,
+                width: width,
+                height: height,
+            });
+        } catch (e) {
+            console.error("Failed to embed background image:", e);
+            // Fallback page if image fails
+            pdfDoc.addPage([595.28, 841.89]); // A4
+        }
+    }
 
     // Register fontkit to support custom fonts
     pdfDoc.registerFontkit(fontkit);

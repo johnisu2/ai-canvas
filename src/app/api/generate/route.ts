@@ -19,6 +19,12 @@ export async function POST(request: NextRequest) {
             include: { elements: true }
         });
 
+        if (doc) {
+            console.log(`[API Generate] Found Document: ID=${doc.id}, Type=${doc.fileType}, URL=${doc.fileUrl}`);
+        } else {
+            console.error(`[API Generate] Document not found for ID: ${documentId}`);
+        }
+
         if (!doc) return NextResponse.json({ error: "Document not found" }, { status: 404 });
 
         // Map Prisma elements to CanvasElement
@@ -43,7 +49,7 @@ export async function POST(request: NextRequest) {
             metadata: el.metadata || undefined
         }));
 
-        const pdfBytes = await generatePdf(doc.fileUrl, elements, json || {});
+        const pdfBytes = await generatePdf(doc.fileUrl, elements, json || {}, doc.fileType);
 
         // Convert Uint8Array to Buffer for Next.js response compatibility
         return new NextResponse(Buffer.from(pdfBytes), {

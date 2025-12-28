@@ -95,9 +95,11 @@ export function CanvasEditor({ documentId, fileUrl, fileType = 'pdf', initialEle
         }
     };
 
+    const isPdf = fileType?.toLowerCase().includes('pdf');
+
     useEffect(() => {
         const loadPdf = async () => {
-            if (fileType !== 'pdf') {
+            if (!isPdf) {
                 setIsLoading(false);
                 return;
             }
@@ -118,7 +120,7 @@ export function CanvasEditor({ documentId, fileUrl, fileType = 'pdf', initialEle
         if (fileUrl) {
             loadPdf();
         }
-    }, [fileUrl, fileType]);
+    }, [fileUrl, isPdf]);
 
     if (isLoading) {
         return (
@@ -128,7 +130,7 @@ export function CanvasEditor({ documentId, fileUrl, fileType = 'pdf', initialEle
         );
     }
 
-    if (error || (fileType === 'pdf' && !pdfDocument)) {
+    if (error || (isPdf && !pdfDocument)) {
         return (
             <div className="flex items-center justify-center h-full text-red-500">
                 {error || "Document not found/loading failed"}
@@ -189,7 +191,7 @@ export function CanvasEditor({ documentId, fileUrl, fileType = 'pdf', initialEle
             </div>
 
             {/* Content Rendering */}
-            {fileType === 'pdf' && pdfDocument ? (
+            {isPdf && pdfDocument ? (
                 Array.from({ length: pdfDocument.numPages }, (_, index) => (
                     <PDFPage
                         key={index + 1}
@@ -209,14 +211,14 @@ export function CanvasEditor({ documentId, fileUrl, fileType = 'pdf', initialEle
                         onDeleteElement={handleDeleteElement}
                     />
                 ))
-            ) : fileType !== 'pdf' ? (
+            ) : !isPdf ? (
                 // Image / Other Rendering
                 <div
                     className="relative shadow-lg bg-white transition-all duration-200 ease-in-out mb-8"
                     style={{
-                        width: '800px', // Default width, maybe adjust or make responsive to image?
+                        width: '800px', // Default width
                         minHeight: '1100px', // Default height
-                        transform: `scale(${scale})`, // Use scale here if not passing down
+                        transform: `scale(${scale})`, // Use scale here
                         transformOrigin: 'top center'
                     }}
                     onDrop={(e) => {
@@ -224,7 +226,14 @@ export function CanvasEditor({ documentId, fileUrl, fileType = 'pdf', initialEle
                         const type = e.dataTransfer.getData("elementType") as ElementType;
                         if (type) {
                             const rect = e.currentTarget.getBoundingClientRect();
-                            const x = (e.clientX - rect.left) / scale;
+                            const x = (e.clientX - rect.left) / scale; // Adjust for scale being on transform? No, getBoundingClientRect accounts for transform. Wait, if transform is on this div, client rect is scaled.
+                            // If transform is on THIS div, then (clientX - left) is in visual pixels.
+                            // We probably need to divide by scale if we want internal 800px coordinates?
+                            // Actually, let's look at what was there before I touched it in step 171/177.
+                            // The previous code (inserted in step 123) had: 
+                            // const x = (e.clientX - rect.left) / scale;
+                            // And scale was applied via transform.
+                            // So let's stick to that for exact revert.
                             const y = (e.clientY - rect.top) / scale;
                             handleAddElement(1, type, x, y);
                         }
@@ -236,16 +245,12 @@ export function CanvasEditor({ documentId, fileUrl, fileType = 'pdf', initialEle
                         src={fileUrl}
                         alt="Document"
                         className="absolute inset-0 w-full h-full object-contain pointer-events-none"
-                        onLoad={(e) => {
-                            // Optional: adjust dimensions to match image natural size?
-                            // For now, object-contain in fixed frame or just let it fill
-                        }}
                     />
 
                     {/* Grid Layer */}
                     {showGrid && (
                         <div className="absolute inset-0 pointer-events-none opacity-20 z-10"
-                            style={{ backgroundImage: `radial-gradient(circle, #6366f1 1px, transparent 1px)`, backgroundSize: `${20}px ${20}px` }}> {/* Fixed 20px grid since we scale container */}
+                            style={{ backgroundImage: `radial-gradient(circle, #6366f1 1px, transparent 1px)`, backgroundSize: `${20}px ${20}px` }}>
                         </div>
                     )}
 
