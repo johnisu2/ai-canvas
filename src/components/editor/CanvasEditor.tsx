@@ -10,7 +10,8 @@ import {
     Save,
     Loader2,
     Home,
-    ChevronLeft
+    ChevronLeft,
+    RotateCw
 } from "lucide-react";
 import Link from 'next/link';
 import { cn } from "@/lib/utils";
@@ -44,6 +45,58 @@ export function CanvasEditor({ documentId, fileUrl, fileType = 'pdf', initialEle
     const [isLoading, setIsLoading] = useState(true);
     const [isSaving, setIsSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
+
+    // Hooks must be at the top level
+    const clipboard = useRef<CanvasElement | null>(null);
+
+    // Keyboard Shortcuts
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            // Ignore if typing in an input
+            if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+
+            // Delete / Backspace
+            if (e.key === 'Delete' || e.key === 'Backspace') {
+                if (selectedElementId) {
+                    handleDeleteElement(selectedElementId);
+                }
+            }
+
+            // Copy (Ctrl+C)
+            if ((e.ctrlKey || e.metaKey) && e.key === 'c') {
+                if (selectedElementId) {
+                    const el = elements.find(e => e.id === selectedElementId);
+                    if (el) {
+                        clipboard.current = el;
+                        console.log('Copied:', el);
+                    }
+                }
+            }
+
+            // Paste (Ctrl+V)
+            if ((e.ctrlKey || e.metaKey) && e.key === 'v') {
+                if (clipboard.current) {
+                    const newId = uuidv4();
+                    const offset = 20; // Slight offset so it doesn't overlap exactly
+                    const newElement: CanvasElement = {
+                        ...clipboard.current,
+                        id: newId,
+                        x: clipboard.current.x + offset,
+                        y: clipboard.current.y + offset,
+                        // Ensure it stays on the same page or current view? 
+                        // For now keep same page as original
+                    };
+                    setElements((prev) => [...prev, newElement]);
+                    setSelectedElementId(newId);
+                    setEditingElementId(null);
+                    setIsDirty(true);
+                }
+            }
+        };
+
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [selectedElementId, elements]);
 
     const handleZoomIn = () => setScale((prev) => Math.min(prev + 0.1, 3.0));
     const handleZoomOut = () => setScale((prev) => Math.max(prev - 0.1, 0.5));
@@ -138,8 +191,20 @@ export function CanvasEditor({ documentId, fileUrl, fileType = 'pdf', initialEle
         );
     }
 
+    // Click outside to deselect
+    const handleBackgroundClick = (e: React.MouseEvent) => {
+        // Only deselect if clicking directly on the background container
+        if (e.target === e.currentTarget) {
+            setSelectedElementId(null);
+            setEditingElementId(null);
+        }
+    };
+
     return (
-        <div className="relative flex flex-col items-center gap-8 py-8 bg-slate-100 h-screen overflow-y-auto overflow-x-hidden pt-20">
+        <div
+            className="relative flex flex-col items-center gap-8 py-8 bg-slate-100 h-screen overflow-y-auto overflow-x-hidden pt-24"
+            onClick={handleBackgroundClick}
+        >
             <Toolbox
                 onZoomIn={handleZoomIn}
                 onZoomOut={handleZoomOut}
@@ -153,14 +218,14 @@ export function CanvasEditor({ documentId, fileUrl, fileType = 'pdf', initialEle
             <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 flex items-center gap-4 bg-white/90 backdrop-blur p-2 rounded-2xl shadow-xl border border-slate-200">
                 <Link
                     href="/"
-                    className="p-2 hover:bg-slate-100 rounded-xl text-slate-500 transition-colors flex items-center gap-2 group border-r border-slate-200 pr-4"
+                    className="p-2 hover:bg-slate-100 rounded-xl text-slate-500 transition-colors flex items-center gap-2 group  pr-4"
                     title="กลับหน้าแรก"
                 >
                     <ChevronLeft className="w-4 h-4 group-hover:-translate-x-0.5 transition-transform" />
                     <Home className="w-4 h-4" />
                     <span className="text-xs font-bold">กลับหน้าแรก</span>
                 </Link>
-                <div className="flex items-center gap-2 px-2 border-r border-slate-200">
+                <div className="flex items-center gap-2 px-2 border-r border-l border-slate-200">
                     <div className={cn("w-2 h-2 rounded-full", isDirty ? "bg-orange-500 animate-pulse" : "bg-green-500")} />
                     <span className="text-xs font-bold text-slate-600">
                         {isDirty ? "มีการเปลี่ยนแปลงที่ยังไม่ได้บันทึก" : "บันทึกข้อมูลแล้ว"}
@@ -187,6 +252,15 @@ export function CanvasEditor({ documentId, fileUrl, fileType = 'pdf', initialEle
                             บันทึกการแก้ไข
                         </>
                     )}
+                </button>
+                <button
+                    onClick={() => window.location.reload()}
+                    className="p-2 hover:bg-slate-100  text-slate-500 transition-colors flex items-center gap-2 group pl-2"
+                    title="รีเซ็ตหน้าจอ"
+                >
+                    <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center group-hover:bg-slate-200 transition-colors">
+                        <RotateCw className="w-4 h-4" />
+                    </div>
                 </button>
             </div>
 

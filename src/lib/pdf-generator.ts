@@ -244,11 +244,19 @@ export async function generatePdf(
 
             if (element.type === "text") {
                 const fontSize = element.fontSize || 14;
+                // Calculate vertical center:
+                // Middle of box = y - (element.height / 2)
+                // Adjustment for baseline ~ (fontSize / 3)
+                const centeredY = y - (element.height / 2) - (fontSize / 3);
+
+                // Add padding to x to match 'px-2' (approx 8px)
+                const paddedX = x + 8;
+
                 drawRichText(
                     page,
                     resolvedValue || "",
-                    x,
-                    y - fontSize,
+                    paddedX,
+                    centeredY,
                     fontSize,
                     rotationDegrees
                 );
