@@ -23,10 +23,11 @@ interface EditModalProps {
     isOpen: boolean;
     onClose: () => void;
     onSave: (id: string, updates: Partial<CanvasElement>) => void;
+    onChange?: (id: string, updates: Partial<CanvasElement>) => void; // Added for Live Preview
     onDelete: (id: string) => void;
 }
 
-export function EditModal({ element, isOpen, onClose, onSave, onDelete }: EditModalProps) {
+export function EditModal({ element, isOpen, onClose, onSave, onChange, onDelete }: EditModalProps) {
     const [formData, setFormData] = useState<Partial<CanvasElement>>({});
     const [tables, setTables] = useState<DBTable[]>([]);
     const [selectedTableId, setSelectedTableId] = useState<number | "">("");
@@ -87,6 +88,10 @@ export function EditModal({ element, isOpen, onClose, onSave, onDelete }: EditMo
 
     const handleChange = (field: keyof CanvasElement, value: any) => {
         setFormData(prev => ({ ...prev, [field]: value }));
+        // Live Preview: Notify parent immediately
+        if (onChange) {
+            onChange(element.id, { [field]: value });
+        }
     };
 
     const handleTableChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -283,9 +288,9 @@ export function EditModal({ element, isOpen, onClose, onSave, onDelete }: EditMo
                                 </label>
                             </div>
                             {/* Preview */}
-                            {formData.fieldValue && formData.fieldValue.startsWith("data:image") && (
-                                <div className="mt-2 w-20 h-20 border rounded overflow-hidden">
-                                    <img src={formData.fieldValue} alt="Preview" className="w-full h-full object-cover" />
+                            {formData.fieldValue && (formData.fieldValue.startsWith("data:image") || formData.fieldValue.startsWith("http") || formData.fieldValue.startsWith("/")) && (
+                                <div className="mt-2 w-20 h-20 border rounded overflow-hidden bg-slate-100 flex items-center justify-center">
+                                    <img src={formData.fieldValue} alt="Preview" className="w-full h-full object-contain" />
                                 </div>
                             )}
                         </div>

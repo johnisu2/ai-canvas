@@ -200,9 +200,11 @@ export function ElementRenderer({ element, scale, isSelected, onUpdate, onSelect
                             {/* QR Preview */}
                             {element.type === 'qr' && (
                                 <div className="w-full h-full flex items-center justify-center rounded p-1">
-                                    {element.fieldValue && element.fieldValue.startsWith('http')
-                                        ? <img src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(element.fieldValue || '')}`} className="w-full h-full object-contain" alt="" />
-                                        : <QrCode className="w-10 h-10 text-purple-400/50" />
+                                    {(element.fieldValue && (element.fieldValue.startsWith('data:image') || element.fieldValue.startsWith('/')))
+                                        ? <img src={element.fieldValue} className="w-full h-full object-contain" alt="" />
+                                        : element.fieldValue
+                                            ? <img src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(element.fieldValue || '')}`} className="w-full h-full object-contain" alt="" />
+                                            : <QrCode className="w-10 h-10 text-purple-400/50" />
                                     }
                                 </div>
                             )}

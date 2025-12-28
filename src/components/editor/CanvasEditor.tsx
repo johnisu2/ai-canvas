@@ -207,6 +207,7 @@ export function CanvasEditor({ documentId, fileUrl, initialElements = [] }: Canv
                     element={elements.find(el => el.id === editingElementId)!}
                     onClose={() => setEditingElementId(null)}
                     onSave={handleUpdateElement}
+                    onChange={handleUpdateElement}
                     onDelete={handleDeleteElement}
                 />
             )}
