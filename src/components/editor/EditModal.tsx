@@ -65,11 +65,14 @@ export function EditModal({ element, isOpen, onClose, onSave, onChange, onDelete
                         const table = data.find((t: DBTable) => t.tableName === tableName);
                         if (table) {
                             setSelectedTableId(table.id);
-                            // Find field ID
                             const field = table.fields.find((f: DBField) => f.fieldName === fieldNamePart);
-                            if (field) {
-                                setSelectedFieldId(field.id);
-                            }
+                            if (field) setSelectedFieldId(field.id);
+                        }
+                    } else {
+                        // Just table name mapping (common for Table elements)
+                        const table = data.find((t: DBTable) => t.tableName === element.fieldName);
+                        if (table) {
+                            setSelectedTableId(table.id);
                         }
                     }
                 }
@@ -88,10 +91,7 @@ export function EditModal({ element, isOpen, onClose, onSave, onChange, onDelete
 
     const handleChange = (field: keyof CanvasElement, value: any) => {
         setFormData(prev => ({ ...prev, [field]: value }));
-        // Live Preview: Notify parent immediately
-        if (onChange) {
-            onChange(element.id, { [field]: value });
-        }
+        if (onChange) onChange(element.id, { [field]: value });
     };
 
     const handleTableChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -99,12 +99,18 @@ export function EditModal({ element, isOpen, onClose, onSave, onChange, onDelete
         if (isNaN(tableId)) {
             setSelectedTableId("");
             setSelectedFieldId("");
-            handleChange("fieldName", ""); // Clear mapping
+            handleChange("fieldName", "");
             return;
         }
         setSelectedTableId(tableId);
-        setSelectedFieldId(""); // Reset field when table changes
-        handleChange("fieldName", "");
+        setSelectedFieldId("");
+
+        const table = tables.find(t => t.id === tableId);
+        if (table && element.type === 'table') {
+            handleChange("fieldName", table.tableName);
+        } else {
+            handleChange("fieldName", "");
+        }
     };
 
     const handleFieldChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -174,37 +180,41 @@ export function EditModal({ element, isOpen, onClose, onSave, onChange, onDelete
 
                 {/* DB Field Map - Dropdowns */}
                 <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">เชื่อมต่อฐานข้อมูล (Database Mapping)</label>
-                    <div className="grid grid-cols-2 gap-2">
+                    <label className="block text-sm font-medium text-slate-700 mb-1">
+                        {element.type === 'table' ? 'เชื่อมต่อตารางข้อมูล (Database Table Mapping)' : 'เชื่อมต่อฐานข้อมูล (Database Mapping)'}
+                    </label>
+                    <div className={cn("grid gap-2", element.type === 'table' ? "grid-cols-1" : "grid-cols-2")}>
                         {/* Table Selector */}
                         <select
                             value={selectedTableId}
                             onChange={handleTableChange}
-                            className="px-3 py-2 border rounded-lg text-sm bg-white outline-none focus:ring-2 focus:ring-indigo-500"
+                            className="px-3 py-2 border rounded-lg text-sm bg-white outline-none focus:ring-2 focus:ring-indigo-500 font-medium"
                         >
-                            <option value="">-- เลือกตาราง --</option>
+                            <option value="">-- {element.type === 'table' ? 'เลือกตารางหลัก' : 'เลือกตาราง'} --</option>
                             {tables.map(table => (
                                 <option key={table.id} value={table.id}>{table.tableName}</option>
                             ))}
                         </select>
 
-                        {/* Field Selector */}
-                        <select
-                            value={selectedFieldId}
-                            onChange={handleFieldChange}
-                            disabled={!selectedTableId}
-                            className="px-3 py-2 border rounded-lg text-sm bg-white outline-none focus:ring-2 focus:ring-indigo-500 disabled:bg-slate-100 disabled:text-slate-400"
-                        >
-                            <option value="">-- เลือกฟิลด์ --</option>
-                            {activeFields.map(field => (
-                                <option key={field.id} value={field.id}>{field.label || field.fieldName}</option>
-                            ))}
-                        </select>
+                        {/* Field Selector (Hidden for Tables) */}
+                        {element.type !== 'table' && (
+                            <select
+                                value={selectedFieldId}
+                                onChange={handleFieldChange}
+                                disabled={!selectedTableId}
+                                className="px-3 py-2 border rounded-lg text-sm bg-white outline-none focus:ring-2 focus:ring-indigo-500 disabled:bg-slate-100 disabled:text-slate-400"
+                            >
+                                <option value="">-- เลือกฟิลด์ --</option>
+                                {activeFields.map(field => (
+                                    <option key={field.id} value={field.id}>{field.label || field.fieldName}</option>
+                                ))}
+                            </select>
+                        )}
                     </div>
                     {/* Read-only view of current mapping */}
                     {formData.fieldName && (
-                        <div className="mt-2 text-xs text-slate-500 font-mono bg-slate-50 p-1.5 rounded border text-right">
-                            แผนผังปัจจุบัน: <span className="text-indigo-600 font-bold">{formData.fieldName}</span>
+                        <div className="mt-2 text-xs text-slate-500 font-mono bg-slate-50/50 p-1.5 rounded border border-slate-100 text-right">
+                            สถานะการเชื่อมต่อ: <span className="text-indigo-600 font-bold">{formData.fieldName}</span>
                         </div>
                     )}
                 </div>
@@ -299,20 +309,6 @@ export function EditModal({ element, isOpen, onClose, onSave, onChange, onDelete
 
                 {element.type === "table" && (
                     <div className="space-y-4 border-t pt-4 mt-4">
-                        <div>
-                            <label className="block text-sm font-medium text-slate-700 mb-1">เลือกตารางข้อมูลหลัก</label>
-                            <select
-                                value={selectedTableId}
-                                onChange={handleTableChange}
-                                className="w-full px-3 py-2 border rounded-lg text-sm bg-white outline-none focus:ring-2 focus:ring-indigo-500"
-                            >
-                                <option value="">-- เลือกตาราง --</option>
-                                {tables.map(table => (
-                                    <option key={table.id} value={table.id}>{table.tableName}</option>
-                                ))}
-                            </select>
-                        </div>
-
                         <div className="flex justify-between items-center mb-2">
                             <label className="block text-sm font-medium text-slate-700">ลำดับคอลัมน์ (Columns)</label>
                             <button
@@ -330,11 +326,40 @@ export function EditModal({ element, isOpen, onClose, onSave, onChange, onDelete
 
                         <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
                             {(Array.isArray(formData.metadata) ? formData.metadata : []).map((col: any, idx: number) => (
-                                <div key={idx} className="grid grid-cols-12 gap-2 items-center bg-slate-50 p-2 rounded-lg border border-slate-100">
+                                <div
+                                    key={idx}
+                                    draggable
+                                    onDragStart={(e) => {
+                                        e.dataTransfer.setData("colIndex", idx.toString());
+                                        e.currentTarget.style.opacity = "0.5";
+                                    }}
+                                    onDragEnd={(e) => {
+                                        e.currentTarget.style.opacity = "1";
+                                    }}
+                                    onDragOver={(e) => {
+                                        e.preventDefault();
+                                        e.currentTarget.style.borderTop = "2px solid #6366f1";
+                                    }}
+                                    onDragLeave={(e) => {
+                                        e.currentTarget.style.borderTop = "";
+                                    }}
+                                    onDrop={(e) => {
+                                        e.preventDefault();
+                                        e.currentTarget.style.borderTop = "";
+                                        const fromIdx = parseInt(e.dataTransfer.getData("colIndex"));
+                                        if (fromIdx === idx) return;
+
+                                        const newCols = [...(formData.metadata as any[])];
+                                        const [movedCol] = newCols.splice(fromIdx, 1);
+                                        newCols.splice(idx, 0, movedCol);
+                                        handleChange("metadata", newCols);
+                                    }}
+                                    className="grid grid-cols-12 gap-2 items-center bg-slate-50 p-2 rounded-lg border border-slate-100 cursor-move hover:bg-slate-100 transition-all"
+                                >
                                     <div className="col-span-1 border-r border-slate-200 text-center font-mono text-[10px] text-slate-400">
                                         {idx + 1}
                                     </div>
-                                    <div className="col-span-8">
+                                    <div className="col-span-5">
                                         <select
                                             value={col.field}
                                             onChange={e => {
@@ -350,6 +375,18 @@ export function EditModal({ element, isOpen, onClose, onSave, onChange, onDelete
                                                 <option key={f.id} value={f.fieldName}>{f.label || f.fieldName}</option>
                                             ))}
                                         </select>
+                                    </div>
+                                    <div className="col-span-3">
+                                        <input
+                                            placeholder="Script (เงื่อนไข)"
+                                            value={col.script || ""}
+                                            onChange={e => {
+                                                const newCols = [...(formData.metadata as any)];
+                                                newCols[idx] = { ...col, script: e.target.value };
+                                                handleChange("metadata", newCols);
+                                            }}
+                                            className="w-full text-[10px] px-2 py-1.5 border border-slate-300 rounded bg-indigo-50/30 font-mono outline-none focus:ring-1 focus:ring-indigo-500"
+                                        />
                                     </div>
                                     <div className="col-span-2">
                                         <input

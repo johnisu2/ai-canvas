@@ -22,7 +22,14 @@ export default function Home() {
   // New State for Gen Dox
   const [documents, setDocuments] = useState<Document[]>([]);
   const [selectedDocId, setSelectedDocId] = useState<string>("");
-  const [jsonInput, setJsonInput] = useState("{\n  \"field_name\": \"value\"\n}");
+  const [jsonInput, setJsonInput] = useState(JSON.stringify({
+    "first_name": "สมชาย",
+    "image": "/uploads/mock_patient.png",
+    "Table": [
+      { "item": "ยาพาราเซลตามอล", "qty": 2, "price": 100 },
+      { "item": "ยาแก้ไอ", "qty": 1, "price": 50 }
+    ]
+  }, null, 2));
   const [isGenerating, setIsGenerating] = useState(false);
 
   useEffect(() => {

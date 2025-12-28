@@ -76,38 +76,83 @@ export async function generatePdf(
     // Helper to fetch image bytes from URL or Base64
     const fetchImageBytes = async (urlOrBase64: string): Promise<Uint8Array | null> => {
         try {
-            console.log(`[PDF Gen] Fetching image from: ${urlOrBase64.substring(0, 50)}...`);
+            if (!urlOrBase64) return null;
+            const sanitizedUrl = urlOrBase64.trim();
+            console.log(`[PDF Gen] Fetching image from: ${sanitizedUrl.substring(0, 50)}...`);
 
-            if (urlOrBase64.startsWith("data:image")) {
-                const parts = urlOrBase64.split(",");
+            if (sanitizedUrl.startsWith("data:image")) {
+                const parts = sanitizedUrl.split(",");
                 if (parts.length < 2) throw new Error("Invalid Base64 data");
                 const base64Data = parts[1];
                 const bytes = Uint8Array.from(Buffer.from(base64Data, "base64"));
                 console.log(`[PDF Gen] Decoded Base64, size: ${bytes.length} bytes`);
                 return bytes;
             }
-            if (urlOrBase64.startsWith("http")) {
-                const response = await fetch(urlOrBase64);
-                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+            if (sanitizedUrl.startsWith("http")) {
+                // Use a controller to timeout if needed, but for now just standard fetch
+                const response = await fetch(sanitizedUrl, {
+                    headers: {
+                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+                    }
+                });
+                if (!response.ok) {
+                    console.warn(`[PDF Gen] HTTP Error ${response.status} for ${sanitizedUrl}`);
+                    return null;
+                }
                 const arrayBuffer = await response.arrayBuffer();
                 const bytes = new Uint8Array(arrayBuffer);
                 console.log(`[PDF Gen] Fetched from URL, size: ${bytes.length} bytes`);
                 return bytes;
             }
-            if (urlOrBase64.startsWith("/")) {
+            if (sanitizedUrl.startsWith("/")) {
                 // Remove leading slash for join to work correctly with public
-                const cleanPath = urlOrBase64.replace(/^\/+/, "");
+                // Also remove any double slashes or spaces that might have sneaked in
+                const cleanPath = sanitizedUrl.replace(/\/+/g, "/").replace(/^\/+/, "");
                 const localPath = join(process.cwd(), "public", cleanPath);
-                console.log(`[PDF Gen] Loading local image from: ${localPath}`);
-                const buffer = await readFile(localPath);
-                console.log(`[PDF Gen] Loaded local file, size: ${buffer.length} bytes`);
-                return new Uint8Array(buffer);
+
+                try {
+                    const buffer = await readFile(localPath);
+                    console.log(`[PDF Gen] Loaded local file: ${localPath}, size: ${buffer.length} bytes`);
+                    return new Uint8Array(buffer);
+                } catch (fsError: any) {
+                    if (fsError.code === 'ENOENT') {
+                        console.warn(`[PDF Gen] Local file not found: ${localPath}`);
+                        return null;
+                    }
+                    throw fsError;
+                }
             }
-            console.warn(`[PDF Gen] Unknown image source type: ${urlOrBase64.substring(0, 20)}`);
+            console.warn(`[PDF Gen] Unknown image source type: ${sanitizedUrl.substring(0, 20)}`);
             return null;
         } catch (error) {
-            console.error(`[PDF Gen] Image fetch failed for "${urlOrBase64.substring(0, 30)}...":`, error);
+            console.error(`[PDF Gen] Image fetch failed:`, error);
             return null;
+        }
+    };
+
+    // Helper to evaluate scripts safely
+    const evaluateScript = (script: string, data: any) => {
+        if (!script) return "";
+        try {
+            const trimmed = script.trim();
+            // If it already has a return statement, use it as is. 
+            // Otherwise, wrap it to make it an expression.
+            const body = (trimmed.startsWith("return") || trimmed.includes(";"))
+                ? trimmed
+                : `return (${trimmed});`;
+
+            const fn = new Function('data', `
+                try { 
+                    ${body} 
+                } catch (e) { 
+                    return "Error: " + e.message; 
+                }
+            `);
+            const result = fn(data);
+            return result === undefined || result === null ? "" : String(result);
+        } catch (e: any) {
+            console.error(`[PDF Gen] Script evaluation failed: ${script}`, e);
+            return "Script Error";
         }
     };
 
@@ -115,7 +160,7 @@ export async function generatePdf(
     for (const element of elements) {
         try {
             const pages = pdfDoc.getPages();
-            const pageIndex = element.pageNumber - 1;
+            const pageIndex = (element.pageNumber || 1) - 1;
 
             if (pageIndex < 0 || pageIndex >= pages.length) continue;
             const page = pages[pageIndex];
@@ -125,54 +170,49 @@ export async function generatePdf(
             let value = element.fieldValue || element.label || "";
             const fieldName = element.fieldName;
 
-            console.log(`[PDF Gen] Element: ${element.id}, Type: ${element.type}, fieldName: "${fieldName}"`);
+            console.log(`[PDF Gen] Processing Element: ${element.id}, Type: ${element.type}, fieldName: "${fieldName}"`);
 
             // Robust Mapping Logic
             let resolvedValue = value;
 
-            // 1. Try direct fieldName match or partial match (if Table.Field)
+            // 1. Try direct fieldName match
             if (dataContext && fieldName) {
-                const shortFieldName = fieldName.includes('.') ? fieldName.split('.').pop()! : fieldName;
-
                 if (dataContext[fieldName] !== undefined) {
                     resolvedValue = String(dataContext[fieldName]);
-                    console.log(`[PDF Gen] Found match (Full): ${fieldName} -> ${resolvedValue}`);
-                } else if (dataContext[shortFieldName] !== undefined) {
-                    resolvedValue = String(dataContext[shortFieldName]);
-                    console.log(`[PDF Gen] Found match (Short): ${shortFieldName} -> ${resolvedValue}`);
+                } else if (fieldName.includes('.') && element.type !== 'table') {
+                    const parts = fieldName.split('.');
+                    const shortFieldName = parts[parts.length - 1];
+                    if (dataContext[shortFieldName] !== undefined) {
+                        resolvedValue = String(dataContext[shortFieldName]);
+                    }
                 }
             }
 
-            // 2. Mustache replacement in the value string
+            // 2. Script Evaluation (Priority over mapping)
+            if (element.script && dataContext) {
+                resolvedValue = evaluateScript(element.script, dataContext);
+                console.log(`[PDF Gen] Script evaluated for ${element.id}: "${resolvedValue}"`);
+            }
+
+            // 3. Mustache replacement
             if (resolvedValue && typeof resolvedValue === 'string' && resolvedValue.includes("{{") && dataContext) {
                 resolvedValue = resolvedValue.replace(/\{\{(.*?)\}\}/g, (_, key) => {
                     const k = key.trim();
-                    const result = dataContext[k] !== undefined ? String(dataContext[k]) : `{{${k}}}`;
-                    console.log(`[PDF Gen] Mustache match: ${k} -> ${result}`);
-                    return result;
+                    return dataContext[k] !== undefined ? String(dataContext[k]) : `{{${k}}}`;
                 });
             }
 
-            // Cleanup: If value is still a default placeholder but we have a fieldName that failed to map
-            // we should probably keep the placeholder or show a blank, but let's log it.
-            if (resolvedValue === "เพิ่มข้อความ..." && fieldName) {
-                console.log(`[PDF Gen] Warning: Element with field "${fieldName}" still has default placeholder.`);
-            }
-
-            console.log(`[PDF Gen] Final value for ${element.id}: "${resolvedValue}"`);
-
             // Common properties
             const x = element.x;
-            const y = pageHeight - element.y; // Top-down to bottom-up (rough)
+            const y = pageHeight - element.y;
             const rotationDegrees = element.rotation || 0;
             const rad = (rotationDegrees * Math.PI) / 180;
 
             if (element.type === "text") {
                 const fontSize = element.fontSize || 14;
-                // Note: drawRichText doesn't support rotation yet, but let's fix the basic drawing first
                 drawRichText(
                     page,
-                    resolvedValue,
+                    resolvedValue || "",
                     x,
                     y - fontSize,
                     fontSize
@@ -181,77 +221,101 @@ export async function generatePdf(
                 const qrValue = resolvedValue || "";
                 let image;
 
-                // If it looks like an image source (Base64, URL, or Local Path), try to render as image first
                 if (qrValue.startsWith("data:image") || qrValue.startsWith("http") || qrValue.startsWith("/")) {
                     const bytes = await fetchImageBytes(qrValue);
                     if (bytes) {
                         try {
-                            const isPng = qrValue.includes("image/png") || qrValue.startsWith("data:image/png") || qrValue.endsWith(".png");
+                            const isPng = qrValue.toLowerCase().includes("png");
                             image = isPng ? await pdfDoc.embedPng(bytes) : await pdfDoc.embedJpg(bytes);
-                            console.log(`[PDF Gen] QR element rendered as image from source`);
-                        } catch (e) {
-                            // Fallback try other format
+                        } catch {
                             try {
                                 image = qrValue.toLowerCase().includes("png") ? await pdfDoc.embedJpg(bytes) : await pdfDoc.embedPng(bytes);
-                            } catch {
-                                console.warn(`[PDF Gen] QR element failed image embedding, will try generating QR code`);
-                            }
+                            } catch { }
                         }
                     }
                 }
 
                 if (image) {
-                    page.drawImage(image, {
-                        x,
-                        y: y - element.height,
-                        width: element.width,
-                        height: element.height,
-                        rotate: radians(rad)
-                    });
+                    page.drawImage(image, { x, y: y - element.height, width: element.width, height: element.height, rotate: radians(rad) });
                 } else {
-                    // Default QR generation
-                    const qrDataUrl = await QRCode.toDataURL(qrValue);
+                    const qrDataUrl = await QRCode.toDataURL(qrValue || " ");
                     const qrImage = await pdfDoc.embedPng(qrDataUrl);
-                    page.drawImage(qrImage, {
-                        x,
-                        y: y - element.height,
-                        width: element.width,
-                        height: element.height,
-                        rotate: radians(rad)
-                    });
+                    page.drawImage(qrImage, { x, y: y - element.height, width: element.width, height: element.height, rotate: radians(rad) });
                 }
             } else if (element.type === "image" || element.type === "signature") {
                 if (resolvedValue && (resolvedValue.startsWith("data:image") || resolvedValue.startsWith("http") || resolvedValue.startsWith("/"))) {
                     const bytes = await fetchImageBytes(resolvedValue);
                     if (bytes) {
-                        console.log(`[PDF Gen] Embedding image for ${element.id}, size: ${bytes.length} bytes`);
                         let image;
                         try {
-                            // Detect type or try PNG then JPG
-                            if (resolvedValue.includes("image/png") || resolvedValue.endsWith(".png")) {
+                            if (resolvedValue.toLowerCase().endsWith(".png") || resolvedValue.startsWith("data:image/png")) {
                                 image = await pdfDoc.embedPng(bytes);
-                            } else if (resolvedValue.includes("image/jpeg") || resolvedValue.includes("image/jpg") || resolvedValue.endsWith(".jpg") || resolvedValue.endsWith(".jpeg")) {
-                                image = await pdfDoc.embedJpg(bytes);
                             } else {
-                                // Fallback: try PNG first
                                 try {
-                                    image = await pdfDoc.embedPng(bytes);
-                                } catch {
                                     image = await pdfDoc.embedJpg(bytes);
+                                } catch {
+                                    image = await pdfDoc.embedPng(bytes);
                                 }
                             }
-                        } catch (embedError) {
-                            console.error(`[PDF Gen] Image embedding failed for ${element.id}:`, embedError);
-                        }
+                        } catch (e) { console.error("Embedding failed", e); }
 
                         if (image) {
-                            page.drawImage(image, {
-                                x,
-                                y: y - element.height,
-                                width: element.width,
-                                height: element.height,
-                                rotate: radians(rad)
-                            });
+                            page.drawImage(image, { x, y: y - element.height, width: element.width, height: element.height, rotate: radians(rad) });
+                        }
+                    }
+                }
+            } else if (element.type === "table") {
+                const columns = Array.isArray(element.metadata) ? element.metadata : [];
+                if (columns.length > 0) {
+                    const tableKey = element.fieldName?.split('.')[0] || "Table";
+                    const tableData = dataContext && Array.isArray(dataContext[tableKey])
+                        ? dataContext[tableKey]
+                        : [];
+
+                    console.log(`[PDF Gen] Table Debug: key="${tableKey}", dataLength=${tableData.length}`);
+
+                    const rowHeight = 22;
+                    const fontSize = element.fontSize || 10;
+                    let currentY = y;
+
+                    // Draw Table Body
+                    for (let i = 0; i < tableData.length; i++) {
+                        const rowData = tableData[i];
+                        let currentX = x;
+
+                        if (i * rowHeight > element.height) break;
+                        const rowY = currentY - (i * rowHeight);
+
+                        // Row Border
+                        page.drawRectangle({
+                            x: x,
+                            y: rowY - rowHeight,
+                            width: element.width,
+                            height: rowHeight,
+                            borderWidth: 0.5,
+                            borderColor: rgb(0.7, 0.7, 0.7),
+                        });
+
+                        for (const col of columns) {
+                            const colWidthPercent = parseFloat(col.width) || (100 / columns.length);
+                            const colWidth = (colWidthPercent / 100) * element.width;
+
+                            let cellValue = rowData[col.field] !== undefined ? String(rowData[col.field]) : "";
+
+                            // Cell Script Evaluation
+                            if (col.script) {
+                                cellValue = evaluateScript(col.script, rowData);
+                            }
+
+                            drawRichText(
+                                page,
+                                cellValue,
+                                currentX + 5,
+                                rowY - (rowHeight * 0.75),
+                                fontSize
+                            );
+
+                            currentX += colWidth;
                         }
                     }
                 }

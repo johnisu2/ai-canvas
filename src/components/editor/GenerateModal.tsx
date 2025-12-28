@@ -10,7 +10,14 @@ interface GenerateModalProps {
 }
 
 export function GenerateModal({ isOpen, onClose, documentId }: GenerateModalProps) {
-    const [jsonInput, setJsonInput] = useState("{\n  \"field_name\": \"value\"\n}");
+    const [jsonInput, setJsonInput] = useState(JSON.stringify({
+        "first_name": "สมชาย",
+        "image": "/uploads/mock_patient.png",
+        "Table": [
+            { "item": "ยาพาราเซลตามอล", "qty": 2, "price": 100 },
+            { "item": "ยาแก้ไอ", "qty": 1, "price": 50 }
+        ]
+    }, null, 2));
     const [isGenerating, setIsGenerating] = useState(false);
 
     if (!isOpen) return null;
