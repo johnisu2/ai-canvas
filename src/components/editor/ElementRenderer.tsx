@@ -3,7 +3,7 @@
 import { Rnd } from "react-rnd";
 import { CanvasElement, ElementType } from "@/types/canvas";
 import { cn } from "@/lib/utils";
-import { useState, useRef } from "react";
+import { useState, useRef, memo } from "react";
 import {
     Edit2,
     Trash2,
@@ -32,7 +32,7 @@ const colorMap: Record<ElementType, string> = {
     signature: "border-pink-500 bg-pink-500/10 text-pink-600",
 };
 
-export function ElementRenderer({ element, scale, isSelected, onUpdate, onSelect, onEdit, onDelete }: ElementRendererProps) {
+export const ElementRenderer = memo(function ElementRenderer({ element, scale, isSelected, onUpdate, onSelect, onEdit, onDelete }: ElementRendererProps) {
     const elementRef = useRef<HTMLDivElement>(null);
     const [isRotating, setIsRotating] = useState(false);
 
@@ -241,4 +241,4 @@ export function ElementRenderer({ element, scale, isSelected, onUpdate, onSelect
             </div>
         </Rnd>
     );
-}
+});

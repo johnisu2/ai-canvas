@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import * as pdfjsLib from "pdfjs-dist";
 import { PDFDocumentProxy } from "pdfjs-dist";
 import { PDFPage } from "./PDFPage";
@@ -102,7 +102,7 @@ export function CanvasEditor({ documentId, fileUrl, fileType = 'pdf', initialEle
     const handleZoomOut = () => setScale((prev) => Math.max(prev - 0.1, 0.5));
     const handleToggleGrid = () => setShowGrid(!showGrid);
 
-    const handleAddElement = (pageNumber: number, type: ElementType, x: number, y: number) => {
+    const handleAddElement = useCallback((pageNumber: number, type: ElementType, x: number, y: number) => {
         const newElement: CanvasElement = {
             id: uuidv4(),
             type,
@@ -115,22 +115,22 @@ export function CanvasEditor({ documentId, fileUrl, fileType = 'pdf', initialEle
         setElements((prev) => [...prev, newElement]);
         setSelectedElementId(newElement.id);
         setIsDirty(true);
-    };
+    }, []);
 
-    const handleUpdateElement = (id: string | number, updates: Partial<CanvasElement>) => {
+    const handleUpdateElement = useCallback((id: string | number, updates: Partial<CanvasElement>) => {
         setElements((prev) => prev.map((el) => (el.id === id ? { ...el, ...updates } : el)));
         setIsDirty(true);
-    };
+    }, []);
 
-    const handleDeleteElement = (id: string | number) => {
+    const handleDeleteElement = useCallback((id: string | number) => {
         if (!confirm("คุณต้องการลบองค์ประกอบนี้ใช่หรือไม่?")) return;
         setElements((prev) => prev.filter((el) => el.id !== id));
         if (selectedElementId === id) setSelectedElementId(null);
         if (editingElementId === id) setEditingElementId(null);
         setIsDirty(true);
-    };
+    }, [selectedElementId, editingElementId]);
 
-    const handleSave = async () => {
+    const handleSave = useCallback(async () => {
         if (!isDirty) return;
         setIsSaving(true);
         try {
@@ -146,7 +146,16 @@ export function CanvasEditor({ documentId, fileUrl, fileType = 'pdf', initialEle
         } finally {
             setIsSaving(false);
         }
-    };
+    }, [isDirty, documentId, elements]);
+
+    // Click outside to deselect
+    const handleBackgroundClick = useCallback((e: React.MouseEvent) => {
+        // Only deselect if clicking directly on the background container
+        if (e.target === e.currentTarget) {
+            setSelectedElementId(null);
+            setEditingElementId(null);
+        }
+    }, []);
 
     const isPdf = fileType?.toLowerCase().includes('pdf');
 
@@ -191,14 +200,7 @@ export function CanvasEditor({ documentId, fileUrl, fileType = 'pdf', initialEle
         );
     }
 
-    // Click outside to deselect
-    const handleBackgroundClick = (e: React.MouseEvent) => {
-        // Only deselect if clicking directly on the background container
-        if (e.target === e.currentTarget) {
-            setSelectedElementId(null);
-            setEditingElementId(null);
-        }
-    };
+
 
     return (
         <div

@@ -5,6 +5,10 @@ import { readFile } from "fs/promises";
 import { join } from "path";
 import { CanvasElement } from "@/types/canvas";
 
+// Cache font bytes globally to avoid reading from disk on every request
+let cachedSarabunBytes: Uint8Array | null = null;
+let cachedSymbolsBytes: Uint8Array | null = null;
+
 export async function generatePdf(
     fileUrl: string,
     elements: CanvasElement[],
@@ -24,32 +28,57 @@ export async function generatePdf(
         // Assume Image (jpg, png)
         pdfDoc = await PDFDocument.create();
 
-        let image;
-        let width, height;
+        // Editor Canvas Dimensions (Fixed 800x1100 in CanvasEditor.tsx)
+        const canvasWidth = 800;
+        const canvasHeight = 1100;
 
         try {
-            // Try embedding as PNG first, then JPG if fails (or check extension if available)
-            // Ideally check extension, but buffer check is robust enough for simple switch
+            let image;
             try {
                 image = await pdfDoc.embedPng(fileBuffer);
             } catch {
                 image = await pdfDoc.embedJpg(fileBuffer);
             }
 
-            width = image.width;
-            height = image.height;
+            const imgWidth = image.width;
+            const imgHeight = image.height;
 
-            const page = pdfDoc.addPage([width, height]);
+            // Calculate scale to mimic CSS 'object-contain'
+            const imgRatio = imgWidth / imgHeight;
+            const canvasRatio = canvasWidth / canvasHeight;
+
+            let finalWidth, finalHeight, offsetX, offsetY;
+
+            if (imgRatio > canvasRatio) {
+                // Wider than canvas -> constrain by width
+                finalWidth = canvasWidth;
+                finalHeight = canvasWidth / imgRatio;
+                offsetX = 0;
+                // object-contain centers vertically
+                offsetY = (canvasHeight - finalHeight) / 2;
+            } else {
+                // Taller than canvas -> constrain by height
+                finalHeight = canvasHeight;
+                finalWidth = canvasHeight * imgRatio;
+                // object-contain centers horizontally
+                offsetX = (canvasWidth - finalWidth) / 2;
+                offsetY = 0;
+            }
+
+            // PDF drawing 'y' is from bottom-left.
+            const pdfY = canvasHeight - offsetY - finalHeight;
+
+            const page = pdfDoc.addPage([canvasWidth, canvasHeight]);
             page.drawImage(image, {
-                x: 0,
-                y: 0,
-                width: width,
-                height: height,
+                x: offsetX,
+                y: pdfY,
+                width: finalWidth,
+                height: finalHeight,
             });
+
         } catch (e) {
             console.error("Failed to embed background image:", e);
-            // Fallback page if image fails
-            pdfDoc.addPage([595.28, 841.89]); // A4
+            pdfDoc.addPage([canvasWidth, canvasHeight]);
         }
     }
 
@@ -57,15 +86,19 @@ export async function generatePdf(
     pdfDoc.registerFontkit(fontkit);
 
     // Embed Fonts
-    // Sarabun: Supports Thai & Latin (English)
-    const sarabunPath = join(process.cwd(), "public", "fonts", "Sarabun-Regular.ttf");
-    const sarabunBytes = await readFile(sarabunPath);
-    const sarabunFont = await pdfDoc.embedFont(sarabunBytes, { subset: true });
+    // Sarabun
+    if (!cachedSarabunBytes) {
+        const sarabunPath = join(process.cwd(), "public", "fonts", "Sarabun-Regular.ttf");
+        cachedSarabunBytes = await readFile(sarabunPath);
+    }
+    const sarabunFont = await pdfDoc.embedFont(cachedSarabunBytes, { subset: true });
 
-    // Noto Sans Symbols 2: Supports symbols like ✔ (U+2714)
-    const symbolsPath = join(process.cwd(), "public", "fonts", "NotoSansSymbols2-Regular.ttf");
-    const symbolsBytes = await readFile(symbolsPath);
-    const symbolsFont = await pdfDoc.embedFont(symbolsBytes, { subset: true });
+    // Noto Sans Symbols 2
+    if (!cachedSymbolsBytes) {
+        const symbolsPath = join(process.cwd(), "public", "fonts", "NotoSansSymbols2-Regular.ttf");
+        cachedSymbolsBytes = await readFile(symbolsPath);
+    }
+    const symbolsFont = await pdfDoc.embedFont(cachedSymbolsBytes, { subset: true });
 
     // Helper to draw text with font switching (Thai/EN/Symbols)
     const drawRichText = (page: any, text: string, x: number, y: number, fontSize: number, rotation: number = 0) => {
