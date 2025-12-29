@@ -250,17 +250,26 @@ export function EditModal({ element, isOpen, onClose, onSave, onChange, onDelete
 
                         {/* Field Selector (Hidden for Tables) */}
                         {element.type !== 'table' && (
-                            <select
-                                value={selectedFieldId}
-                                onChange={handleFieldChange}
-                                disabled={!selectedTableId}
-                                className="px-3 py-2 border rounded-lg text-sm bg-white outline-none focus:ring-2 focus:ring-indigo-500 disabled:bg-slate-100 disabled:text-slate-400"
-                            >
-                                <option value="">-- เลือกฟิลด์ --</option>
-                                {activeFields.map(field => (
-                                    <option key={field.id} value={field.id}>{field.label || field.fieldName}</option>
-                                ))}
-                            </select>
+                            <div className="flex flex-col gap-1">
+                                <select
+                                    value={selectedFieldId}
+                                    onChange={handleFieldChange}
+                                    disabled={!selectedTableId}
+                                    className="px-3 py-2 border rounded-lg text-sm bg-white outline-none focus:ring-2 focus:ring-indigo-500 disabled:bg-slate-100 disabled:text-slate-400"
+                                >
+                                    <option value="">-- เลือกฟิลด์ --</option>
+                                    {activeFields.map(field => (
+                                        <option key={field.id} value={field.id}>{field.label || field.fieldName}</option>
+                                    ))}
+                                </select>
+
+                                {selectedFieldId && (
+                                    <div className="flex items-center gap-1.5 px-2 py-1 bg-slate-50 border border-slate-100 rounded text-[10px] text-slate-500 font-mono">
+                                        <Code className="w-3 h-3 text-indigo-400" />
+                                        <span>Technical Name: <span className="text-indigo-600">{activeFields.find(f => f.id === selectedFieldId)?.fieldName}</span></span>
+                                    </div>
+                                )}
+                            </div>
                         )}
                     </div>
                 </div>
