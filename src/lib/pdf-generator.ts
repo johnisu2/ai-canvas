@@ -479,6 +479,21 @@ export async function generatePdf(
                 };
             };
 
+            // NEW: Helper for Image Center-based Rotation
+            // In PDF, rotating image around (x,y) shifts it. We must solve for (x,y) 
+            // such that rotating around it places the image center at (cx, cy).
+            const getRotatedImageCorner = (unrotatedX: number, unrotatedY: number, width: number, height: number) => {
+                if (rotDeg === 0) return { x: unrotatedX, y: unrotatedY };
+                const r = (pdfRotDeg * Math.PI) / 180;
+                // Solve for bottom-left (x,y) given center (cx,cy)
+                // x = cx - (w/2 * cos(r) - h/2 * sin(r))
+                // y = cy - (w/2 * sin(r) + h/2 * cos(r))
+                return {
+                    x: cx - (width / 2 * Math.cos(r) - height / 2 * Math.sin(r)),
+                    y: cy - (width / 2 * Math.sin(r) + height / 2 * Math.cos(r))
+                };
+            };
+
             if (element.type === "text") {
                 const fontSize = element.fontSize || 14;
                 const align = element.alignment || 'left';
@@ -514,12 +529,12 @@ export async function generatePdf(
                 }
 
                 if (image) {
-                    const pos = rotatePoint(element.x, (pageHeight - element.y) - h);
+                    const pos = getRotatedImageCorner(element.x, (pageHeight - element.y) - h, w, h);
                     page.drawImage(image, { x: pos.x, y: pos.y, width: w, height: h, rotate: degrees(pdfRotDeg) });
                 } else {
                     const qrDataUrl = await QRCode.toDataURL(qrValue || " ");
                     const qrImage = await pdfDoc.embedPng(qrDataUrl);
-                    const pos = rotatePoint(element.x, (pageHeight - element.y) - h);
+                    const pos = getRotatedImageCorner(element.x, (pageHeight - element.y) - h, w, h);
                     page.drawImage(qrImage, { x: pos.x, y: pos.y, width: w, height: h, rotate: degrees(pdfRotDeg) });
                 }
             } else if (element.type === "image" || element.type === "signature") {
@@ -540,7 +555,7 @@ export async function generatePdf(
                         } catch (e) { console.error("Embedding failed", e); }
 
                         if (image) {
-                            const pos = rotatePoint(element.x, (pageHeight - element.y) - h);
+                            const pos = getRotatedImageCorner(element.x, (pageHeight - element.y) - h, w, h);
                             page.drawImage(image, { x: pos.x, y: pos.y, width: w, height: h, rotate: degrees(pdfRotDeg) });
                         }
                     }
@@ -619,10 +634,13 @@ export async function generatePdf(
                                 uX = currentColX + colWidth - textActualWidth - 5;
                             }
 
-                            const uY = (pageHeight - rowVisualTop) - (rowHeight / 2) - (fontSize * 0.15);
+                            // Adjust uY to center text perfectly in rowHeight
+                            // Using (fontSize * 0.7) to estimate the visual height of the text (cap-height)
+                            const textVisualHeight = fontSize * 0.7;
+                            const uY = (pageHeight - rowVisualTop) - (rowHeight / 2) - (textVisualHeight / 2) + 2;
 
-                            // Debug Coord
-                            console.log(`[PDF Gen]    Drawing at (x:${uX}, y:${uY}) with Text "${truncatedVal}"`);
+                            // Debug Coord (Optional)
+                            // console.log(`[PDF Gen]    Drawing at (x:${uX}, y:${uY}) with Text "${truncatedVal}"`);
 
                             const pos = rotatePoint(uX, uY);
 
