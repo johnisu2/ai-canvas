@@ -19,7 +19,59 @@ export async function generatePdf(
     console.log("[PDF Gen] Generating PDF for elements: ", elements);
     console.log("[PDF Gen] Generating PDF for dataContext: ", dataContext);
     console.log("[PDF Gen] Generating PDF for fileType: ", fileType);
-
+    const _dataContext = {
+        patients: {
+            hn: 'HN001',
+            first_name: 'สมชาย',
+            last_name: 'ใจดี',
+            gender: 'ชาย',
+            phone: '081-234-5678',
+            address: '123 ถ.สุขุมวิท กทม.',
+            dob: '1985-05-20T00:00:00.000Z',
+            blood_group: 'O',
+            id_card: '1-1001-01234-56-7',
+            allergies: 'Penicillin',
+            image: '/uploads/mock_patient.png'
+        },
+        patient: [{
+            hn: 'HN001',
+            first_name: 'สมชาย',
+            last_name: 'ใจดี',
+            gender: 'ชาย',
+            phone: '081-234-5678',
+            address: '123 ถ.สุขุมวิท กทม.',
+            dob: '1985-05-20T00:00:00.000Z',
+            blood_group: 'O',
+            id_card: '1-1001-01234-56-7',
+            allergies: 'Penicillin',
+            image: '/uploads/mock_patient.png'
+        }, {
+            hn: 'HN001',
+            first_name: 'สมชาย',
+            last_name: 'ใจดี',
+            gender: 'ชาย',
+            phone: '081-234-5678',
+            address: '123 ถ.สุขุมวิท กทม.',
+            dob: '1985-05-20T00:00:00.000Z',
+            blood_group: 'O',
+            id_card: '1-1001-01234-56-7',
+            allergies: 'Penicillin',
+            image: '/uploads/mock_patient.png'
+        }],
+        drugs: {
+            code: 'D001',
+            name: 'พาราเซตามอล',
+            trade_name: 'พาราเซตามอล',
+            dosage: '1-2 เม็ด',
+            usage: 'รับประทานพร้อมน้ำสะอาด',
+            unit: '1',
+            category: 'ยาใช้ภายใน',
+            price: 40
+        }
+    };
+    // FORCE USE MOCK DATA
+    dataContext = _dataContext;
+    const data: any = _dataContext;
     // Helper to evaluate scripts safely
     const evaluateScript = (script: string, data: any, currentValue?: any) => {
         if (!script) return currentValue || "";
@@ -238,88 +290,100 @@ export async function generatePdf(
             // Resolve Value: Chain (DB Mapping -> Formula -> Script)
             let resolvedValue: any = undefined;
             let skipElement = false;
-            const fieldName = element.fieldName;
+            const fieldName = element.fieldName?.trim(); // Trim whitespace
+
+            console.log(`[PDF Gen] Processing Element ${element.id} (Type: ${element.type}) - FieldName: "${fieldName}"`);
 
             // 1. Database Mapping (Base Value)
-            if (fieldName && dataContext) {
-                if (fieldName.includes('.')) {
-                    // Dot Notation Case (e.g. patients.first_name)
-                    const parts = fieldName.split('.');
-                    const tableKey = parts[0];
-                    const propKey = parts[1];
-
-                    const sourceData = dataContext[tableKey];
-                    if (sourceData === undefined) {
-                        console.log(`[PDF Gen] Table/Object "${tableKey}" not found. Skipping element: ${element.id}`);
-                        skipElement = true;
-                    } else if (Array.isArray(sourceData)) {
-                        if (element.type === 'table') {
-                            // Table type + Dot notation (e.g. patients.items)
-                            if (sourceData.length === 0) {
-                                console.log(`[PDF Gen] Array "${tableKey}" is empty. Skipping table.`);
-                                skipElement = true;
-                            } else {
-                                resolvedValue = sourceData;
-                            }
-                        } else {
-                            // Non-table elements picking first record
-                            if (sourceData.length > 0) {
-                                resolvedValue = sourceData[0][propKey];
-                            } else {
-                                console.log(`[PDF Gen] Array "${tableKey}" is empty. Skipping field.`);
-                                skipElement = true;
-                            }
+            if (fieldName && data) {
+                // Helper to resolve path
+                const getPath = (obj: any, path: string) => {
+                    const parts = path.split('.');
+                    let current = obj;
+                    for (const part of parts) {
+                        if (current === undefined || current === null) return undefined;
+                        if (Array.isArray(current) && isNaN(Number(part))) {
+                            current = current.length > 0 ? current[0] : undefined;
                         }
-                    } else if (sourceData && typeof sourceData === 'object') {
-                        // Simple object support
-                        resolvedValue = sourceData[propKey];
+                        if (current === undefined) return undefined;
+                        current = current[part];
                     }
-                } else {
-                    // Simple Field Case (e.g. patients)
-                    if (dataContext[fieldName] !== undefined) {
-                        resolvedValue = dataContext[fieldName];
+                    return current;
+                };
 
-                        // Special handling for Tables
-                        if (element.type === 'table') {
-                            if (Array.isArray(resolvedValue)) {
-                                if (resolvedValue.length === 0) {
-                                    console.log(`[PDF Gen] Table "${fieldName}" is an empty array. Skipping.`);
-                                    skipElement = true;
-                                }
-                            } else if (resolvedValue && typeof resolvedValue === 'object') {
-                                // IMPROVEMENT: If user provides a single object for a table, wrap it in an array
-                                console.log(`[PDF Gen] Table "${fieldName}" received a single object. Wrapping in array for display.`);
-                                resolvedValue = [resolvedValue];
-                            } else {
-                                console.log(`[PDF Gen] Table "${fieldName}" data is invalid (not array/obj). skipping.`);
+                // 1. Try Resolving from Root
+                resolvedValue = getPath(data, fieldName);
+                console.log(`[PDF Gen]   > Search Root '${fieldName}':`, resolvedValue !== undefined ? `FOUND (${Array.isArray(resolvedValue) ? 'Array len ' + resolvedValue.length : typeof resolvedValue})` : "NOT FOUND");
+
+                // 2. Fallback: Check 'patients' for text fields
+                if (resolvedValue === undefined && data.patients) {
+                    resolvedValue = getPath(data.patients, fieldName);
+                    console.log(`[PDF Gen]   > Search 'patients.${fieldName}':`, resolvedValue !== undefined ? "FOUND" : "NOT FOUND");
+                }
+
+                // 3. Special Fallback for Table: If fieldName is 'patient' but data is in 'patients' (or vice versa common mistakes)
+                // Just in case user named field 'patient' but meant the object, or named 'patient' and meant the array.
+                // Our mock data has 'patient' as Array. logic 1 should find it.
+
+                if (resolvedValue !== undefined) {
+                    // Handle Table vs Single Data
+                    if (element.type === 'table') {
+                        if (Array.isArray(resolvedValue)) {
+                            if (resolvedValue.length === 0) {
+                                console.log(`[PDF Gen] Table Array "${fieldName}" is empty. Skipping.`);
                                 skipElement = true;
+                            } else {
+                                console.log(`[PDF Gen] Table Data Found. Rows: ${resolvedValue.length}`);
+                                // Debug first row keys
+                                console.log(`[PDF Gen] Row 1 Keys: ${Object.keys(resolvedValue[0]).join(', ')}`);
                             }
+                        } else if (typeof resolvedValue === 'object') {
+                            console.log(`[PDF Gen] Table "${fieldName}" single object. Wrapping.`);
+                            resolvedValue = [resolvedValue];
+                        } else {
+                            console.log(`[PDF Gen] Table Field "${fieldName}" invalid type (${typeof resolvedValue}). Skipping.`);
+                            skipElement = true;
                         }
                     } else {
-                        console.log(`[PDF Gen] Field "${fieldName}" not found in dataContext. Skipping element: ${element.id}`);
-                        skipElement = true;
+                        // Single Value
+                        if (Array.isArray(resolvedValue)) {
+                            if (resolvedValue.length > 0) resolvedValue = resolvedValue[0];
+                            else skipElement = true;
+                        }
                     }
+                } else {
+                    console.log(`[PDF Gen] Field "${fieldName}" NOT FOUND anywhere.`);
+                    skipElement = true;
                 }
             }
 
             // CRITICAL: Skip element if data source was required (fieldName exists) but not found
-            if (skipElement) continue;
+            if (skipElement) {
+                if (element.type === 'table') {
+                    console.log(`[PDF Gen] Element ${element.id} was marked to SKIP, but proceeding for debugging Table logic. ResolvedValue:`, resolvedValue);
+                    skipElement = false;
+                } else {
+                    console.log(`[PDF Gen] SKIPPING Element ${element.id} (Type: ${element.type}) due to missing data.`);
+                    continue;
+                }
+            }
 
             // Fallback for elements without fieldName (Static Elements)
             if (resolvedValue === undefined) {
                 resolvedValue = element.fieldValue || element.label || "";
+                console.log(`[PDF Gen]   > Used Static Value: "${resolvedValue}"`);
             }
 
-            // 2. Formula (Chain result from DB)
+            // 2. Formula
             if (element.formula && dataContext) {
                 resolvedValue = evaluateScript(element.formula, dataContext, resolvedValue);
-                console.log(`[PDF Gen] Formula result for ${element.id}: "${resolvedValue}"`);
+                console.log(`[PDF Gen] Formula result: "${resolvedValue}"`);
             }
 
-            // 3. Script (Chain result from Formula/DB)
+            // 3. Script
             if (element.script && dataContext) {
                 resolvedValue = evaluateScript(element.script, dataContext, resolvedValue);
-                console.log(`[PDF Gen] Script result for ${element.id}: "${resolvedValue}"`);
+                console.log(`[PDF Gen] Script result: "${resolvedValue}"`);
             }
 
             if (resolvedValue === undefined || resolvedValue === null || resolvedValue === "") {
@@ -327,15 +391,17 @@ export async function generatePdf(
                 resolvedValue = element.fieldValue || element.label || "";
             }
 
-            // Ensure string for remaining processing
-            resolvedValue = String(resolvedValue);
+            // Ensure string for remaining processing ONLY IF NOT TABLE
+            if (element.type !== 'table') {
+                resolvedValue = String(resolvedValue);
 
-            // 3. Mustache replacement
-            if (resolvedValue && typeof resolvedValue === 'string' && resolvedValue.includes("{{") && dataContext) {
-                resolvedValue = resolvedValue.replace(/\{\{(.*?)\}\}/g, (_, key) => {
-                    const k = key.trim();
-                    return dataContext[k] !== undefined ? String(dataContext[k]) : `{{${k}}}`;
-                });
+                // 3. Mustache replacement
+                if (resolvedValue && typeof resolvedValue === 'string' && resolvedValue.includes("{{") && dataContext) {
+                    resolvedValue = resolvedValue.replace(/\{\{(.*?)\}\}/g, (_, key) => {
+                        const k = key.trim();
+                        return dataContext[k] !== undefined ? String(dataContext[k]) : `{{${k}}}`;
+                    });
+                }
             }
 
             // Geometry & Center-based Rotation Logic
@@ -425,43 +491,58 @@ export async function generatePdf(
                     }
                 }
             } else if (element.type === "table") {
+                console.log(`[PDF Gen] >>> ENTERING TABLE LOGIC for Element ${element.id} <<<`);
+
                 const metadata = element.metadata || {};
-                const columns = Array.isArray(metadata) ? metadata : (metadata.columns || []);
+                console.log(`[PDF Gen] Metadata:`, JSON.stringify(metadata));
+
+                let columns = Array.isArray(metadata) ? metadata : (metadata.columns || []);
+                console.log(`[PDF Gen] Columns Found: ${columns.length}`);
+
+                // Auto-generate columns if missing but data exists
+                if (columns.length === 0 && Array.isArray(resolvedValue) && resolvedValue.length > 0) {
+                    const firstRow = resolvedValue[0];
+                    if (firstRow && typeof firstRow === 'object') {
+                        console.log(`[PDF Gen] No columns defined. Auto-generating from keys:`, Object.keys(firstRow));
+                        columns = Object.keys(firstRow).map(key => ({
+                            header: key,
+                            field: key,
+                            width: (100 / Object.keys(firstRow).length).toString()
+                        }));
+                    }
+                }
+
                 const rowHeight = metadata.rowHeight || 22;
+
                 if (columns.length > 0) {
                     const tableData = Array.isArray(resolvedValue) ? resolvedValue : [];
+                    console.log(`[PDF Gen] Table Data Rows: ${tableData.length}`);
+
                     const fontSize = element.fontSize || 10;
 
                     for (let i = 0; i < tableData.length; i++) {
+                        console.log(`[PDF Gen] --- Process Row ${i} ---`);
                         const rowData = tableData[i];
                         const rowVisualTop = element.y + (i * rowHeight);
-                        if ((i + 1) * rowHeight > element.height) break;
+                        if ((i + 1) * rowHeight > element.height) {
+                            console.log(`[PDF Gen] STOP: Table Overflow at row ${i} (VisualTop: ${rowVisualTop}, MaxH: ${element.height})`);
+                            break;
+                        }
 
                         let currentColX = element.x;
                         for (const col of columns) {
                             const colWidthPercent = parseFloat(col.width) || (100 / columns.length);
                             const colWidth = (colWidthPercent / 100) * element.width;
+                            console.log(`[PDF Gen]    Col '${col.field}' (Width: ${colWidth})`);
 
-                            // [NEW VERSION] ปรับให้ข้อความไม่เลยกรอบ (Truncate if overflow)
-                            // คำนวณค่า Cell และตัดข้อความหากยาวเกิน colWidth (ลบ padding นิดหน่อย)
                             let cellValue = rowData[col.field] !== undefined ? String(rowData[col.field]) : "";
+                            console.log(`[PDF Gen]    Value: "${cellValue}"`);
+
                             if (col.script) cellValue = evaluateScript(col.script, rowData);
 
-                            const padding = 10; // Left 5 + Right 5
+                            const padding = 10;
                             const maxTextWidth = colWidth - padding;
 
-                            // หาความกว้างจริงเพื่อใช้จัด Alignment (หลังตัดข้อความ)
-                            const getActualWidth = (t: string) => {
-                                let wSum = 0;
-                                for (const char of t) {
-                                    const code = char.charCodeAt(0);
-                                    const font = code > 0x2000 ? symbolsFont : sarabunFont;
-                                    wSum += font.widthOfTextAtSize(char, fontSize);
-                                }
-                                return wSum;
-                            };
-
-                            // ตัดข้อความก่อนเพื่อคำนวณตำแหน่ง Alignment ที่ถูกต้อง
                             let truncatedVal = cellValue;
                             let currentW = 0;
                             let fitText = "";
@@ -476,7 +557,7 @@ export async function generatePdf(
                             truncatedVal = fitText;
 
                             const textActualWidth = currentW;
-                            let uX = currentColX + 5; // Left Padding 5
+                            let uX = currentColX + 5;
                             if (element.alignment === 'center') {
                                 uX = currentColX + (colWidth - textActualWidth) / 2;
                             } else if (element.alignment === 'right') {
@@ -484,31 +565,34 @@ export async function generatePdf(
                             }
 
                             const uY = (pageHeight - rowVisualTop) - (rowHeight / 2) - (fontSize * 0.15);
+
+                            // Debug Coord
+                            console.log(`[PDF Gen]    Drawing at (x:${uX}, y:${uY}) with Text "${truncatedVal}"`);
+
                             const pos = rotatePoint(uX, uY);
 
-                            // วาดข้อความที่ตัดแล้ว
                             drawRichText(page, truncatedVal, pos.x, pos.y, fontSize, pdfRotDeg);
 
-                            /*
-                            //  แบบข้อความเลยกรอบได้ V1
-                            let cellValueOld = rowData[col.field] !== undefined ? String(rowData[col.field]) : "";
-                            if (col.script) cellValueOld = evaluateScript(col.script, rowData);
-
-                            const textWidthOld = sarabunFont.widthOfTextAtSize(cellValueOld, fontSize);
-                            let uXOld = currentColX + 5;
-                            if (element.alignment === 'center') {
-                                uXOld = currentColX + (colWidth - textWidthOld) / 2;
-                            } else if (element.alignment === 'right') {
-                                uXOld = currentColX + colWidth - textWidthOld - 5;
+                            // DEBUG: Draw Border
+                            try {
+                                page.drawRectangle({
+                                    x: pos.x,
+                                    y: pos.y - 2,
+                                    width: colWidth,
+                                    height: rowHeight,
+                                    borderColor: rgb(1, 0, 0),
+                                    borderWidth: 1,
+                                });
+                                console.log(`[PDF Gen]    Border Drawn`);
+                            } catch (e) {
+                                console.error(`[PDF Gen]    Border Draw Failed`, e);
                             }
-                            const uYOld = (pageHeight - rowVisualTop) - (rowHeight / 2) - (fontSize * 0.15);
-                            const posOld = rotatePoint(uXOld, uYOld);
-                            drawRichText(page, cellValueOld, posOld.x, posOld.y, fontSize, pdfRotDeg);
-                            */
 
                             currentColX += colWidth;
                         }
                     }
+                } else {
+                    console.log(`[PDF Gen] !!! NO COLUMNS DEFINED !!! Skipping Table Render.`);
                 }
             }
         } catch (err) {
