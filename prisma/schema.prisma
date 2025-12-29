@@ -46,6 +46,7 @@ model DbConfigTable {
   tableName     String          // Technical name (e.g. table name or SP name) for data mapping
   displayName   String?         // Display name for UI
   procedureName String          // Stored Procedure or Table Name for query
+  isMultiRow    Int             // 1 for multi-row, 0 for single-row
   fields        DbConfigField[]
   params        DbConfigParam[]
 

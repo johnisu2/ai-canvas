@@ -236,20 +236,78 @@ export async function generatePdf(
             const { height: pageHeight } = page.getSize();
 
             // Resolve Value: Chain (DB Mapping -> Formula -> Script)
-            let resolvedValue: any = "";
+            let resolvedValue: any = undefined;
+            let skipElement = false;
             const fieldName = element.fieldName;
 
             // 1. Database Mapping (Base Value)
-            if (dataContext && fieldName) {
-                if (dataContext[fieldName] !== undefined) {
-                    resolvedValue = dataContext[fieldName];
-                } else if (fieldName.includes('.') && element.type !== 'table') {
+            if (fieldName && dataContext) {
+                if (fieldName.includes('.')) {
+                    // Dot Notation Case (e.g. patients.first_name)
                     const parts = fieldName.split('.');
-                    const shortFieldName = parts[parts.length - 1];
-                    if (dataContext[shortFieldName] !== undefined) {
-                        resolvedValue = dataContext[shortFieldName];
+                    const tableKey = parts[0];
+                    const propKey = parts[1];
+
+                    const sourceData = dataContext[tableKey];
+                    if (sourceData === undefined) {
+                        console.log(`[PDF Gen] Table/Object "${tableKey}" not found. Skipping element: ${element.id}`);
+                        skipElement = true;
+                    } else if (Array.isArray(sourceData)) {
+                        if (element.type === 'table') {
+                            // Table type + Dot notation (e.g. patients.items)
+                            if (sourceData.length === 0) {
+                                console.log(`[PDF Gen] Array "${tableKey}" is empty. Skipping table.`);
+                                skipElement = true;
+                            } else {
+                                resolvedValue = sourceData;
+                            }
+                        } else {
+                            // Non-table elements picking first record
+                            if (sourceData.length > 0) {
+                                resolvedValue = sourceData[0][propKey];
+                            } else {
+                                console.log(`[PDF Gen] Array "${tableKey}" is empty. Skipping field.`);
+                                skipElement = true;
+                            }
+                        }
+                    } else if (sourceData && typeof sourceData === 'object') {
+                        // Simple object support
+                        resolvedValue = sourceData[propKey];
+                    }
+                } else {
+                    // Simple Field Case (e.g. patients)
+                    if (dataContext[fieldName] !== undefined) {
+                        resolvedValue = dataContext[fieldName];
+
+                        // Special handling for Tables
+                        if (element.type === 'table') {
+                            if (Array.isArray(resolvedValue)) {
+                                if (resolvedValue.length === 0) {
+                                    console.log(`[PDF Gen] Table "${fieldName}" is an empty array. Skipping.`);
+                                    skipElement = true;
+                                }
+                            } else if (resolvedValue && typeof resolvedValue === 'object') {
+                                // IMPROVEMENT: If user provides a single object for a table, wrap it in an array
+                                console.log(`[PDF Gen] Table "${fieldName}" received a single object. Wrapping in array for display.`);
+                                resolvedValue = [resolvedValue];
+                            } else {
+                                console.log(`[PDF Gen] Table "${fieldName}" data is invalid (not array/obj). skipping.`);
+                                skipElement = true;
+                            }
+                        }
+                    } else {
+                        console.log(`[PDF Gen] Field "${fieldName}" not found in dataContext. Skipping element: ${element.id}`);
+                        skipElement = true;
                     }
                 }
+            }
+
+            // CRITICAL: Skip element if data source was required (fieldName exists) but not found
+            if (skipElement) continue;
+
+            // Fallback for elements without fieldName (Static Elements)
+            if (resolvedValue === undefined) {
+                resolvedValue = element.fieldValue || element.label || "";
             }
 
             // 2. Formula (Chain result from DB)
@@ -371,9 +429,7 @@ export async function generatePdf(
                 const columns = Array.isArray(metadata) ? metadata : (metadata.columns || []);
                 const rowHeight = metadata.rowHeight || 22;
                 if (columns.length > 0) {
-                    const tableKey = element.fieldName?.split('.')[0];
-                    const keyToUse = tableKey || "Table";
-                    const tableData = (dataContext && Array.isArray(dataContext[keyToUse])) ? dataContext[keyToUse] : [];
+                    const tableData = Array.isArray(resolvedValue) ? resolvedValue : [];
                     const fontSize = element.fontSize || 10;
 
                     for (let i = 0; i < tableData.length; i++) {
