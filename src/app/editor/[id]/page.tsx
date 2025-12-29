@@ -30,6 +30,8 @@ export default async function EditorPage({ params }: { params: Promise<{ id: str
         height: el.height,
         label: el.label || undefined,
         fieldName: el.fieldName || undefined,
+        dbConfigTableId: el.dbConfigTableId || undefined,
+        dbConfigFieldId: el.dbConfigFieldId || undefined,
         fieldValue: el.fieldValue || undefined,
         script: el.script || undefined,
         formula: el.formula || undefined,

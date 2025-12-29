@@ -267,31 +267,35 @@ export function EditModal({ element, isOpen, onClose, onSave, onChange, onDelete
 
 
                 {/* Formula */}
-                <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1 flex items-center gap-2">
-                        <Calculator className="w-3 h-3 text-indigo-600" />  สูตรคำนวณ
-                    </label>
-                    <input
-                        type="text"
-                        value={formData.formula || ""}
-                        onChange={e => handleChange("formula", e.target.value)}
-                        className="w-full px-3 py-2 border border-indigo-100 rounded-lg font-mono text-sm bg-indigo-50/30 focus:bg-white focus:ring-2 focus:ring-indigo-500 outline-none"
-                        placeholder="เช่น data.amount * data.qty"
-                    />
-                </div>
+                {element.type === "text" && (
+                    <>
 
-                {/* Script */}
-                <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1 flex items-center gap-2">
-                        <Code className="w-3 h-3 text-purple-600" /> สคริปต์ / เงื่อนไข
-                    </label>
-                    <textarea
-                        value={formData.script || ""}
-                        onChange={e => handleChange("script", e.target.value)}
-                        className="w-full px-3 py-2 border border-purple-100 rounded-lg font-mono text-sm h-20 focus:ring-2 focus:ring-purple-500 outline-none"
-                        placeholder="เช่น return data.total > 1000 ? 'ยอดเยี่ยม' : 'ปกติ';"
-                    />
-                </div>
+                        <div>
+                            <label className="block text-sm font-medium text-slate-700 mb-1 flex items-center gap-2">
+                                <Calculator className="w-3 h-3 text-indigo-600" />  สูตรคำนวณ
+                            </label>
+                            <input
+                                type="text"
+                                value={formData.formula || ""}
+                                onChange={e => handleChange("formula", e.target.value)}
+                                className="w-full px-3 py-2 border border-indigo-100 rounded-lg font-mono text-sm bg-indigo-50/30 focus:bg-white focus:ring-2 focus:ring-indigo-500 outline-none"
+                                placeholder="เช่น data.amount * data.qty"
+                            />
+                        </div>
+
+                        {/* Script */}
+                        <div>
+                            <label className="block text-sm font-medium text-slate-700 mb-1 flex items-center gap-2">
+                                <Code className="w-3 h-3 text-purple-600" /> สคริปต์ / เงื่อนไข
+                            </label>
+                            <textarea
+                                value={formData.script || ""}
+                                onChange={e => handleChange("script", e.target.value)}
+                                className="w-full px-3 py-2 border border-purple-100 rounded-lg font-mono text-sm h-20 focus:ring-2 focus:ring-purple-500 outline-none"
+                                placeholder="เช่น return data.total > 1000 ? 'ยอดเยี่ยม' : 'ปกติ';"
+                            />
+                        </div></>
+                )}
 
 
                 {/* Type Specifics (FontSize etc) */}
