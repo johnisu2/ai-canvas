@@ -117,27 +117,27 @@ export function PDFPage({
         <div
             className="relative shadow-lg bg-white transition-all duration-200 ease-in-out mb-8"
             style={{
-                width: dimensions.width || '800px',
-                height: dimensions.height || '1100px',
+                width: (dimensions.width / scale) || '800px',
+                height: (dimensions.height / scale) || '1100px',
                 minHeight: '800px'
             }}
             onDrop={handleDrop}
             onDragOver={handleDragOver}
         >
-            <canvas ref={canvasRef} className="absolute inset-0 pointer-events-none" />
+            <canvas ref={canvasRef} className="absolute inset-0 pointer-events-none w-full h-full" />
 
             {/* Grid Layer */}
             {showGrid && (
                 <div className="absolute inset-0 pointer-events-none opacity-20 z-10"
-                    style={{ backgroundImage: `radial-gradient(circle, #6366f1 1px, transparent 1px)`, backgroundSize: `${20 * scale}px ${20 * scale}px` }}>
+                    style={{ backgroundImage: `radial-gradient(circle, #6366f1 1px, transparent 1px)`, backgroundSize: `${20}px ${20}px` }}>
                 </div>
             )}
 
             {/* Elements Rendering Layer */}
             <div className="absolute inset-0 w-full h-full"
                 style={{
-                    width: dimensions.width || '800px',
-                    height: dimensions.height || '1100px',
+                    width: (dimensions.width / scale) || '800px',
+                    height: (dimensions.height / scale) || '1100px',
                     minHeight: '800px'
                 }}>
                 {elements.map((el) => (

@@ -203,10 +203,7 @@ export function CanvasEditor({ documentId, fileUrl, fileType = 'pdf', initialEle
 
 
     return (
-        <div
-            className="relative flex flex-col items-center gap-8 py-8 bg-slate-100 h-screen overflow-y-auto overflow-x-hidden pt-24"
-            onClick={handleBackgroundClick}
-        >
+        <div className="relative flex flex-col bg-slate-100 h-screen overflow-hidden">
             <Toolbox
                 onZoomIn={handleZoomIn}
                 onZoomOut={handleZoomOut}
@@ -266,91 +263,95 @@ export function CanvasEditor({ documentId, fileUrl, fileType = 'pdf', initialEle
                 </button>
             </div>
 
-            {/* Content Rendering */}
-            {isPdf && pdfDocument ? (
-                Array.from({ length: pdfDocument.numPages }, (_, index) => (
-                    <PDFPage
-                        key={index + 1}
-                        pageNumber={index + 1}
-                        pdfDocument={pdfDocument}
-                        scale={scale}
-                        showGrid={showGrid}
-                        elements={elements.filter((el) => el.pageNumber === index + 1)}
-                        selectedElementId={selectedElementId}
-                        onAddElement={(type: ElementType, x: number, y: number) => handleAddElement(index + 1, type, x, y)}
-                        onUpdateElement={handleUpdateElement}
-                        onSelectElement={setSelectedElementId}
-                        onEditElement={(id: string | number) => {
-                            setEditingElementId(id);
-                            setSelectedElementId(id);
-                        }}
-                        onDeleteElement={handleDeleteElement}
-                    />
-                ))
-            ) : !isPdf ? (
-                // Image / Other Rendering
+            {/* Main Editor Area */}
+            <div className="flex-1 w-full overflow-auto pt-24" onClick={handleBackgroundClick}>
                 <div
-                    className="relative shadow-lg bg-white transition-all duration-200 ease-in-out mb-8"
+                    className="min-h-full w-full flex flex-col items-center transition-all duration-200"
                     style={{
-                        width: '800px', // Default width
-                        height: '1100px', // Fixed height to ensure absolute children cover full area
-                        transform: `scale(${scale})`, // Use scale here
-                        transformOrigin: 'top center'
+                        transform: `scale(${scale})`,
+                        transformOrigin: 'top center',
+                        width: `${100 / scale}%`,
+                        paddingBottom: '100px'
                     }}
-                    onDrop={(e) => {
-                        e.preventDefault();
-                        const type = e.dataTransfer.getData("elementType") as ElementType;
-                        if (type) {
-                            const rect = e.currentTarget.getBoundingClientRect();
-                            const x = (e.clientX - rect.left) / scale; // Adjust for scale being on transform? No, getBoundingClientRect accounts for transform. Wait, if transform is on this div, client rect is scaled.
-                            // If transform is on THIS div, then (clientX - left) is in visual pixels.
-                            // We probably need to divide by scale if we want internal 800px coordinates?
-                            // Actually, let's look at what was there before I touched it in step 171/177.
-                            // The previous code (inserted in step 123) had: 
-                            // const x = (e.clientX - rect.left) / scale;
-                            // And scale was applied via transform.
-                            // So let's stick to that for exact revert.
-                            const y = (e.clientY - rect.top) / scale;
-                            handleAddElement(1, type, x, y);
-                        }
-                    }}
-                    onDragOver={(e) => e.preventDefault()}
                 >
-                    {/* Background Image */}
-                    <img
-                        src={fileUrl}
-                        alt="Document"
-                        className="absolute inset-0 object-contain pointer-events-none"
-                    />
-
-                    {/* Grid Layer */}
-                    {showGrid && (
-                        <div className="absolute inset-0 pointer-events-none opacity-20 z-10"
-                            style={{ backgroundImage: `radial-gradient(circle, #6366f1 1px, transparent 1px)`, backgroundSize: `${20}px ${20}px` }}>
-                        </div>
-                    )}
-
-                    {/* Elements Layer */}
-                    <div className="absolute inset-0 w-full h-full ">
-                        {elements.map((el) => (
-                            <ElementRenderer
-                                key={el.id}
-                                element={el}
-                                scale={scale} // Pass actual scale to Rnd so it calculates drag deltas correctly
-                                isSelected={selectedElementId === el.id}
-                                onUpdate={handleUpdateElement}
-                                onSelect={setSelectedElementId}
-                                onEdit={(id: string | number) => {
-                                    setEditingElementId(id);
-                                    setSelectedElementId(id);
+                    <div className="flex flex-col items-center gap-8">
+                        {isPdf && pdfDocument ? (
+                            Array.from({ length: pdfDocument.numPages }, (_, index) => (
+                                <PDFPage
+                                    key={index + 1}
+                                    pageNumber={index + 1}
+                                    pdfDocument={pdfDocument}
+                                    scale={scale} // We'll adjust PDFPage later to handle this if needed
+                                    showGrid={showGrid}
+                                    elements={elements.filter((el) => el.pageNumber === index + 1)}
+                                    selectedElementId={selectedElementId}
+                                    onAddElement={(type: ElementType, x: number, y: number) => handleAddElement(index + 1, type, x, y)}
+                                    onUpdateElement={handleUpdateElement}
+                                    onSelectElement={setSelectedElementId}
+                                    onEditElement={(id: string | number) => {
+                                        setEditingElementId(id);
+                                        setSelectedElementId(id);
+                                    }}
+                                    onDeleteElement={handleDeleteElement}
+                                />
+                            ))
+                        ) : !isPdf ? (
+                            // Image / Other Rendering
+                            <div
+                                className="relative shadow-lg bg-white transition-all duration-200 ease-in-out"
+                                style={{
+                                    width: '800px',
+                                    height: '1100px',
                                 }}
-                                onDelete={handleDeleteElement}
-                            />
-                        ))}
+                                onDrop={(e) => {
+                                    e.preventDefault();
+                                    const type = e.dataTransfer.getData("elementType") as ElementType;
+                                    if (type) {
+                                        const rect = e.currentTarget.getBoundingClientRect();
+                                        const x = (e.clientX - rect.left) / scale;
+                                        const y = (e.clientY - rect.top) / scale;
+                                        handleAddElement(1, type, x, y);
+                                    }
+                                }}
+                                onDragOver={(e) => e.preventDefault()}
+                            >
+                                {/* Background Image */}
+                                <img
+                                    src={fileUrl}
+                                    alt="Document"
+                                    className="absolute inset-0 object-contain pointer-events-none"
+                                />
+
+                                {/* Grid Layer */}
+                                {showGrid && (
+                                    <div className="absolute inset-0 pointer-events-none opacity-20 z-10"
+                                        style={{ backgroundImage: `radial-gradient(circle, #6366f1 1px, transparent 1px)`, backgroundSize: `${20}px ${20}px` }}>
+                                    </div>
+                                )}
+
+                                {/* Elements Layer */}
+                                <div className="absolute inset-0 w-full h-full ">
+                                    {elements.map((el) => (
+                                        <ElementRenderer
+                                            key={el.id}
+                                            element={el}
+                                            scale={scale}
+                                            isSelected={selectedElementId === el.id}
+                                            onUpdate={handleUpdateElement}
+                                            onSelect={setSelectedElementId}
+                                            onEdit={(id: string | number) => {
+                                                setEditingElementId(id);
+                                                setSelectedElementId(id);
+                                            }}
+                                            onDelete={handleDeleteElement}
+                                        />
+                                    ))}
+                                </div>
+                            </div>
+                        ) : null}
                     </div>
                 </div>
-            ) : null
-            }
+            </div>
 
             {
                 editingElementId && (
