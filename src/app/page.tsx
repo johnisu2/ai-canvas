@@ -5,6 +5,7 @@ import { Upload, FileText, Search, Plus, MoreVertical, Loader2, FileDown } from 
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { useRouter } from "next/navigation";
+import Swal from 'sweetalert2';
 
 interface Document {
   id: number;
@@ -38,6 +39,34 @@ export default function Home() {
         "drug_code": "D002",
         "qty": 10,
         "amount": 50
+      }
+    ],
+    "patients": [
+      {
+        "hn": "HN001",
+        "firstName": "สมชาย",
+        "lastName": "ใจดี",
+        "gender": "ชาย",
+        "phone": "081-234-5678",
+        "address": "123 ถ.สุขุมวิท กทม.",
+        "dob": "1985-05-20",
+        "bloodGroup": "O",
+        "idCard": "1-1001-01234-56-7",
+        "allergies": "Penicillin",
+        "image": "/uploads/mock_patient.png"
+      },
+      {
+        "hn": "HN002",
+        "firstName": "สมหญิง",
+        "lastName": "รักเรียน",
+        "gender": "หญิง",
+        "phone": "089-876-5432",
+        "address": "456/7 ซ.อารีย์ ถ.พหลโยธิน กทม.",
+        "dob": "1992-11-12",
+        "bloodGroup": "AB",
+        "idCard": "3-2101-00456-78-9",
+        "allergies": "ไม่มี",
+        "image": "/uploads/mock_patient_2.png"
       }
     ]
   }, null, 2));
@@ -91,11 +120,11 @@ export default function Home() {
       if (data.success) {
         router.push(`/editor/${data.documentId}`);
       } else {
-        alert("อัพโหลดล้มเหลว");
+        Swal.fire({ icon: 'error', title: 'อัพโหลดล้มเหลว' });
       }
     } catch (error) {
       console.error("Upload error:", error);
-      alert("เกิดข้อผิดพลาดในการอัพโหลด");
+      Swal.fire({ icon: 'error', title: 'เกิดข้อผิดพลาดในการอัพโหลด' });
     } finally {
       setIsUploading(false);
     }
@@ -103,7 +132,7 @@ export default function Home() {
 
   const handleGeneratePDF = async () => {
     if (!selectedDocId) {
-      alert("กรุณาเลือกเอกสารต้นฉบับ");
+      Swal.fire({ icon: 'warning', title: 'กรุณาเลือกเอกสารต้นฉบับ' });
       return;
     }
     try {
@@ -127,11 +156,11 @@ export default function Home() {
         window.URL.revokeObjectURL(url);
       } else {
         console.error("Failed");
-        alert("สร้างเอกสารล้มเหลว");
+        Swal.fire({ icon: 'error', title: 'สร้างเอกสารล้มเหลว' });
       }
     } catch (e) {
       console.error(e);
-      alert("JSON ไม่ถูกต้อง หรือเกิดข้อผิดพลาด");
+      Swal.fire({ icon: 'error', title: 'JSON ไม่ถูกต้อง หรือเกิดข้อผิดพลาด' });
     } finally {
       setIsGenerating(false);
     }

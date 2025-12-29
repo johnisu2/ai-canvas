@@ -292,7 +292,7 @@ export function EditModal({ element, isOpen, onClose, onSave, onChange, onDelete
                                 value={formData.script || ""}
                                 onChange={e => handleChange("script", e.target.value)}
                                 className="w-full px-3 py-2 border border-purple-100 rounded-lg font-mono text-sm h-20 focus:ring-2 focus:ring-purple-500 outline-none"
-                                placeholder="เช่น return data.total > 1000 ? 'ยอดเยี่ยม' : 'ปกติ';"
+                                placeholder="เช่น return value > 1000 ? 'ยอดเยี่ยม' : 'ปกติ';(ข้อมูลดึงจาก DB Field Map)"
                             />
                         </div></>
                 )}
@@ -357,144 +357,167 @@ export function EditModal({ element, isOpen, onClose, onSave, onChange, onDelete
                     </div>
                 )}
 
-                {element.type === "table" && (
-                    <div className="space-y-4 border-t pt-4 mt-4">
-                        <div className="flex justify-between items-center mb-2">
-                            <label className="block text-sm font-medium text-slate-700">ลำดับคอลัมน์ (Columns)</label>
-                            <button
-                                type="button"
-                                onClick={() => {
-                                    const currentCols = Array.isArray(formData.metadata) ? formData.metadata : [];
-                                    const newCols = [...currentCols, { header: 'คอลัมน์ใหม่', field: '', width: '' }];
-                                    handleChange("metadata", newCols);
-                                }}
-                                className="text-xs bg-indigo-600 text-white px-3 py-1.5 rounded-lg hover:bg-indigo-700 font-medium transition-colors"
-                            >
-                                + เพิ่มคอลัมน์
-                            </button>
-                        </div>
+                {element.type === "table" && (() => {
+                    const metadata = formData.metadata || {};
+                    const columns = Array.isArray(metadata) ? metadata : (metadata.columns || []);
+                    const rowHeight = Array.isArray(metadata) ? 22 : (metadata.rowHeight || 22);
 
-                        <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
-                            {(Array.isArray(formData.metadata) ? formData.metadata : []).map((col: any, idx: number) => (
-                                <div
-                                    key={idx}
-                                    draggable
-                                    onDragStart={(e) => {
-                                        e.dataTransfer.setData("colIndex", idx.toString());
-                                        e.currentTarget.style.opacity = "0.5";
-                                    }}
-                                    onDragEnd={(e) => {
-                                        e.currentTarget.style.opacity = "1";
-                                    }}
-                                    onDragOver={(e) => {
-                                        e.preventDefault();
-                                        e.currentTarget.style.borderTop = "2px solid #6366f1";
-                                    }}
-                                    onDragLeave={(e) => {
-                                        e.currentTarget.style.borderTop = "";
-                                    }}
-                                    onDrop={(e) => {
-                                        e.preventDefault();
-                                        e.currentTarget.style.borderTop = "";
-                                        const fromIdx = parseInt(e.dataTransfer.getData("colIndex"));
-                                        if (fromIdx === idx) return;
+                    return (
+                        <div className="space-y-4 border-t pt-4 mt-4">
+                            <div className="grid grid-cols-2 gap-4 mb-4">
+                                <div className="col-span-1">
+                                    <label className="block text-sm font-medium text-slate-700 mb-1">
+                                        ความสูงของแถว (Row Height)
+                                    </label>
+                                    <input
+                                        type="number"
+                                        value={rowHeight}
+                                        onChange={e => {
+                                            const val = parseInt(e.target.value) || 22;
+                                            handleChange("metadata", { columns, rowHeight: val });
+                                        }}
+                                        className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
+                                        placeholder="ค่าเริ่มต้น 22"
+                                    />
+                                </div>
+                            </div>
 
-                                        const newCols = [...(formData.metadata as any[])];
-                                        const [movedCol] = newCols.splice(fromIdx, 1);
-                                        newCols.splice(idx, 0, movedCol);
-                                        handleChange("metadata", newCols);
+                            <div className="flex justify-between items-center mb-2">
+                                <label className="block text-sm font-medium text-slate-700">ลำดับคอลัมน์ (Columns)</label>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        const newCols = [...columns, { header: 'คอลัมน์ใหม่', field: '', width: '' }];
+                                        handleChange("metadata", { columns: newCols, rowHeight });
                                     }}
-                                    className="grid grid-cols-12 gap-2 items-center bg-slate-50 p-2 rounded-lg border border-slate-100 cursor-move hover:bg-slate-100 transition-all"
+                                    className="text-xs bg-indigo-600 text-white px-3 py-1.5 rounded-lg hover:bg-indigo-700 font-medium transition-colors"
                                 >
-                                    <div className="col-span-1 border-r border-slate-200 text-center font-mono text-[10px] text-slate-400">
-                                        {idx + 1}
-                                    </div>
-                                    <div className="col-span-5 flex flex-col gap-1">
-                                        {activeFields.length > 0 && (
-                                            <select
-                                                value={col.fieldId || ""}
+                                    + เพิ่มคอลัมน์
+                                </button>
+                            </div>
+
+                            <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
+                                {columns.map((col: any, idx: number) => (
+                                    <div
+                                        key={idx}
+                                        draggable
+                                        onDragStart={(e) => {
+                                            e.dataTransfer.setData("colIndex", idx.toString());
+                                            e.currentTarget.style.opacity = "0.5";
+                                        }}
+                                        onDragEnd={(e) => {
+                                            e.currentTarget.style.opacity = "1";
+                                        }}
+                                        onDragOver={(e) => {
+                                            e.preventDefault();
+                                            e.currentTarget.style.borderTop = "2px solid #6366f1";
+                                        }}
+                                        onDragLeave={(e) => {
+                                            e.currentTarget.style.borderTop = "";
+                                        }}
+                                        onDrop={(e) => {
+                                            e.preventDefault();
+                                            e.currentTarget.style.borderTop = "";
+                                            const fromIdx = parseInt(e.dataTransfer.getData("colIndex"));
+                                            if (fromIdx === idx) return;
+
+                                            const newCols = [...columns];
+                                            const [movedCol] = newCols.splice(fromIdx, 1);
+                                            newCols.splice(idx, 0, movedCol);
+                                            handleChange("metadata", { columns: newCols, rowHeight });
+                                        }}
+                                        className="grid grid-cols-12 gap-2 items-center bg-slate-50 p-2 rounded-lg border border-slate-100 cursor-move hover:bg-slate-100 transition-all"
+                                    >
+                                        <div className="col-span-1 border-r border-slate-200 text-center font-mono text-[10px] text-slate-400">
+                                            {idx + 1}
+                                        </div>
+                                        <div className="col-span-8 flex flex-col gap-1">
+                                            {activeFields.length > 0 && (
+                                                <select
+                                                    value={col.fieldId || ""}
+                                                    onChange={e => {
+                                                        const fieldId = parseInt(e.target.value);
+                                                        const fieldObj = activeFields.find(f => f.id === fieldId);
+                                                        const newCols = [...columns];
+                                                        newCols[idx] = {
+                                                            ...col,
+                                                            field: fieldObj?.fieldName || "",
+                                                            fieldId: isNaN(fieldId) ? undefined : fieldId
+                                                        };
+                                                        handleChange("metadata", { columns: newCols, rowHeight });
+                                                    }}
+                                                    className="w-full text-xs px-2 py-1.5 border border-slate-300 rounded bg-white outline-none focus:ring-1 focus:ring-indigo-500"
+                                                >
+                                                    <option value="">-- เลือกจาก DB --</option>
+                                                    {activeFields.map(f => (
+                                                        <option key={f.id} value={f.id}>{f.label || f.fieldName}</option>
+                                                    ))}
+                                                </select>
+                                            )}
+                                            {/* <input
+                                                placeholder="Key (เช่น item, qty)"
+                                                value={col.field || ""}
                                                 onChange={e => {
-                                                    const fieldId = parseInt(e.target.value);
-                                                    const fieldObj = activeFields.find(f => f.id === fieldId);
-                                                    const newCols = [...(formData.metadata as any)];
+                                                    const newCols = [...columns];
                                                     newCols[idx] = {
                                                         ...col,
-                                                        field: fieldObj?.fieldName || "",
-                                                        fieldId: isNaN(fieldId) ? undefined : fieldId
+                                                        field: e.target.value,
+                                                        fieldId: undefined
                                                     };
-                                                    handleChange("metadata", newCols);
+                                                    handleChange("metadata", { ...metadata, columns: newCols });
                                                 }}
-                                                className="w-full text-xs px-2 py-1.5 border border-slate-300 rounded bg-white outline-none focus:ring-1 focus:ring-indigo-500"
+                                                className="w-full text-xs px-2 py-1.5 border border-slate-300 rounded bg-white outline-none focus:ring-1 focus:ring-indigo-500 font-mono"
+                                            /> */}
+                                        </div>
+                                        {/* <div className="col-span-3">
+                                            <input
+                                                placeholder="Script (เงื่อนไข)"
+                                                value={col.script || ""}
+                                                onChange={e => {
+                                                    const newCols = [...columns];
+                                                    newCols[idx] = { ...col, script: e.target.value };
+                                                    handleChange("metadata", { columns: newCols, rowHeight });
+                                                }}
+                                                className="w-full text-[10px] px-2 py-1.5 border border-slate-300 rounded bg-indigo-50/30 font-mono outline-none focus:ring-1 focus:ring-indigo-500"
+                                            />
+                                        </div> */}
+                                        <div className="col-span-2">
+                                            <input
+                                                placeholder="กว้าง"
+                                                value={col.width}
+                                                onChange={e => {
+                                                    const newCols = [...columns];
+                                                    newCols[idx] = { ...col, width: e.target.value };
+                                                    handleChange("metadata", { columns: newCols, rowHeight });
+                                                }}
+                                                className="w-full text-xs px-1 py-1.5 border border-slate-300 rounded text-center outline-none"
+                                            />
+                                        </div>
+                                        <div className="col-span-1 flex justify-center">
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    const newCols = columns.filter((_: any, i: number) => i !== idx);
+                                                    handleChange("metadata", { columns: newCols, rowHeight });
+                                                }}
+                                                className="text-slate-400 hover:text-red-500 transition-colors"
                                             >
-                                                <option value="">-- เลือกจาก DB --</option>
-                                                {activeFields.map(f => (
-                                                    <option key={f.id} value={f.id}>{f.label || f.fieldName}</option>
-                                                ))}
-                                            </select>
-                                        )}
-                                        {/* <input
-                                            placeholder="Key (เช่น item, qty)"
-                                            value={col.field || ""}
-                                            onChange={e => {
-                                                const newCols = [...(formData.metadata as any)];
-                                                newCols[idx] = {
-                                                    ...col,
-                                                    field: e.target.value,
-                                                    fieldId: undefined // Clear ID if typing manually
-                                                };
-                                                handleChange("metadata", newCols);
-                                            }}
-                                            className="w-full text-xs px-2 py-1.5 border border-slate-300 rounded bg-white outline-none focus:ring-1 focus:ring-indigo-500 font-mono"
-                                        /> */}
+                                                <Trash2 size={14} />
+                                            </button>
+                                        </div>
                                     </div>
-                                    <div className="col-span-3">
-                                        <input
-                                            placeholder="Script (เงื่อนไข)"
-                                            value={col.script || ""}
-                                            onChange={e => {
-                                                const newCols = [...(formData.metadata as any)];
-                                                newCols[idx] = { ...col, script: e.target.value };
-                                                handleChange("metadata", newCols);
-                                            }}
-                                            className="w-full text-[10px] px-2 py-1.5 border border-slate-300 rounded bg-indigo-50/30 font-mono outline-none focus:ring-1 focus:ring-indigo-500"
-                                        />
-                                    </div>
-                                    <div className="col-span-2">
-                                        <input
-                                            placeholder="กว้าง"
-                                            value={col.width}
-                                            onChange={e => {
-                                                const newCols = [...(formData.metadata as any)];
-                                                newCols[idx] = { ...col, width: e.target.value };
-                                                handleChange("metadata", newCols);
-                                            }}
-                                            className="w-full text-xs px-1 py-1.5 border border-slate-300 rounded text-center outline-none"
-                                        />
-                                    </div>
-                                    <div className="col-span-1 flex justify-center">
-                                        <button
-                                            type="button"
-                                            onClick={() => {
-                                                const newCols = (formData.metadata as any[]).filter((_: any, i: number) => i !== idx);
-                                                handleChange("metadata", newCols);
-                                            }}
-                                            className="text-slate-400 hover:text-red-500 transition-colors"
-                                        >
-                                            <Trash2 size={14} />
-                                        </button>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-
-                        {(!Array.isArray(formData.metadata) || formData.metadata.length === 0) && (
-                            <div className="text-center py-6 border-2 border-dashed border-slate-200 rounded-lg bg-slate-50">
-                                <p className="text-xs text-slate-500">ยังไม่มีการกำหนดคอลัมน์</p>
-                                <p className="text-[10px] text-slate-400 mt-1">คลิก "+ เพิ่มคอลัมน์" เพื่อเริ่มต้น</p>
+                                ))}
                             </div>
-                        )}
-                    </div>
-                )}
+
+                            {columns.length === 0 && (
+                                <div className="text-center py-6 border-2 border-dashed border-slate-200 rounded-lg bg-slate-50">
+                                    <p className="text-xs text-slate-500">ยังไม่มีการกำหนดคอลัมน์</p>
+                                    <p className="text-[10px] text-slate-400 mt-1">คลิก "+ เพิ่มคอลัมน์" เพื่อเริ่มต้น</p>
+                                </div>
+                            )}
+                        </div>
+                    );
+                })()}
                 {element.type === "table" && (
                     <div className="grid grid-cols-2 gap-4">
                         <div>

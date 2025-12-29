@@ -140,7 +140,7 @@ export const ElementRenderer = memo(function ElementRenderer({ element, scale, i
                     )}
                 >
                     <div className="flex-1 w-full h-full relative drag-handle cursor-move">
-                        <div className={cn("select-none h-full w-full flex flex-col", element.type === 'table' ? "p-0" : "p-1 pointer-events-none")}>
+                        <div className={cn("select-none h-full w-full flex flex-col pointer-events-none")}>
                             {element.type === 'image' && element.fieldValue && (
                                 <img src={element.fieldValue} className="w-full h-full object-contain" alt="" />
                             )}
@@ -157,9 +157,12 @@ export const ElementRenderer = memo(function ElementRenderer({ element, scale, i
                             )}
 
                             {element.type === 'table' && (
-                                <div className="w-full h-full flex flex-col bg-white/50 relative pointer-events-none bg-opacity-50">
+                                <div className="w-full h-full flex flex-col bg-white/50 relative bg-opacity-50">
                                     {(() => {
-                                        const columns = Array.isArray(element.metadata) ? element.metadata : [];
+                                        const metadata = element.metadata || {};
+                                        const columns = Array.isArray(metadata) ? metadata : (metadata.columns || []);
+                                        const rowHeight = Array.isArray(metadata) ? 22 : (metadata.rowHeight || 22);
+
                                         if (columns.length === 0) return <div className="flex-1 flex items-center justify-center opacity-30"><Grid /> Empty Table</div>;
 
                                         let cur = 0;
@@ -169,7 +172,7 @@ export const ElementRenderer = memo(function ElementRenderer({ element, scale, i
                                             <>
                                                 {/* Grid Lines */}
                                                 {positions.map((pos: any, i: number) => (
-                                                    <div key={`g-${i}`} className="absolute inset-y-0 w-px bg-slate-300 opacity-80" style={{ left: `${pos}%`, transform: 'translateX(-0.5px)' }} />
+                                                    <div key={`g-${i}`} className="absolute inset-y-0 w-px bg-slate-300 opacity-80 pointer-events-none" style={{ left: `${pos}%`, transform: 'translateX(-0.5px)' }} />
                                                 ))}
 
                                                 {/* Resizers */}
@@ -194,7 +197,9 @@ export const ElementRenderer = memo(function ElementRenderer({ element, scale, i
                                                                     const newC = [...columns];
                                                                     newC[i] = { ...newC[i], width: `${nI}%` };
                                                                     newC[i + 1] = { ...newC[i + 1], width: `${nNX}%` };
-                                                                    onUpdate(element.id, { metadata: newC });
+
+                                                                    const nextMetadata = Array.isArray(metadata) ? newC : { ...metadata, columns: newC };
+                                                                    onUpdate(element.id, { metadata: nextMetadata });
                                                                 }
                                                             };
                                                             const up = () => { document.removeEventListener('mousemove', move); document.removeEventListener('mouseup', up); };
@@ -207,27 +212,29 @@ export const ElementRenderer = memo(function ElementRenderer({ element, scale, i
                                                 ))}
 
                                                 {/* Data Row */}
-                                                <div className="absolute inset-0 flex flex-col">
-                                                    {[1, 2, 3, 4, 5].map((row: number, idx: number, arr: any[]) => (
-                                                        <div key={row} className="relative flex h-full min-h-[1.25rem]">
-                                                            {/* horizontal line */}
-                                                            {idx !== arr.length - 1 && (
+                                                <div className="absolute inset-0 flex flex-col overflow-hidden pointer-events-none">
+                                                    {(() => {
+                                                        const numRows = Math.floor(element.height / rowHeight) || 1;
+                                                        const rowArr = Array.from({ length: numRows }, (_, i) => i + 1);
+                                                        return rowArr.map((row: number, idx: number) => (
+                                                            <div key={row} style={{ height: `${rowHeight}px` }} className="relative flex shrink-0">
+                                                                {/* horizontal line */}
                                                                 <div className="absolute bottom-0 left-0 right-0 h-[1px] bg-slate-400/80 z-[60]" />
-                                                            )}
 
-                                                            {columns.map((col: any, j: number) => (
-                                                                <div
-                                                                    key={j}
-                                                                    style={{ width: col.width || `${100 / columns.length}%` }}
-                                                                    className="flex items-center px-2 truncate leading-none"
-                                                                >
-                                                                    {row === 1
-                                                                        ? <span className="text-[9px] font-bold text-indigo-500 uppercase">{col.field || "FIELD"}</span>
-                                                                        : <span className="text-[8px] text-slate-300 italic">data...</span>}
-                                                                </div>
-                                                            ))}
-                                                        </div>
-                                                    ))}
+                                                                {columns.map((col: any, j: number) => (
+                                                                    <div
+                                                                        key={j}
+                                                                        style={{ width: col.width || `${100 / columns.length}%` }}
+                                                                        className="flex items-center px-2 truncate leading-none"
+                                                                    >
+                                                                        {row === 1
+                                                                            ? <span className="text-[9px] font-bold text-indigo-500 uppercase">{col.field || "FIELD"}</span>
+                                                                            : <span className="text-[8px] text-slate-300 italic">data...</span>}
+                                                                    </div>
+                                                                ))}
+                                                            </div>
+                                                        ));
+                                                    })()}
                                                 </div>
                                             </>
                                         );
@@ -236,7 +243,7 @@ export const ElementRenderer = memo(function ElementRenderer({ element, scale, i
                             )}
 
                             {element.type === 'text' && (
-                                <div className={cn("flex-1 flex items-center px-2", element.alignment === 'center' && "justify-center text-center", element.alignment === 'right' && "justify-end text-right")}>
+                                <div className={cn("flex-1 flex items-center px-2 pointer-events-none", element.alignment === 'center' && "justify-center text-center", element.alignment === 'right' && "justify-end text-right")}>
                                     <span className="truncate w-full font-semibold text-slate-800" style={{ fontSize: element.fontSize ? `${element.fontSize}px` : '14px' }}>
                                         {element.script
                                             ? <span className="text-purple-600 flex items-center gap-1">{"{}"} Script</span>
@@ -255,6 +262,6 @@ export const ElementRenderer = memo(function ElementRenderer({ element, scale, i
                     </div>
                 </div>
             </div>
-        </Rnd>
+        </Rnd >
     );
 });

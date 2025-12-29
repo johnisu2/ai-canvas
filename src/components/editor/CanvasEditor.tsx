@@ -14,6 +14,7 @@ import {
     RotateCw
 } from "lucide-react";
 import Link from 'next/link';
+import Swal from 'sweetalert2';
 import { cn } from "@/lib/utils";
 import { Toolbox } from "./Toolbox";
 import { EditModal } from "./EditModal";
@@ -122,8 +123,19 @@ export function CanvasEditor({ documentId, fileUrl, fileType = 'pdf', initialEle
         setIsDirty(true);
     }, []);
 
-    const handleDeleteElement = useCallback((id: string | number) => {
-        if (!confirm("คุณต้องการลบองค์ประกอบนี้ใช่หรือไม่?")) return;
+    const handleDeleteElement = useCallback(async (id: string | number) => {
+        const result = await Swal.fire({
+            title: 'ยืนยันการลบ?',
+            text: "คุณต้องการลบองค์ประกอบนี้ใช่หรือไม่?",
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#4f46e5',
+            cancelButtonColor: '#ef4444',
+            confirmButtonText: 'ใช่, ลบเลย',
+            cancelButtonText: 'ยกเลิก'
+        });
+
+        if (!result.isConfirmed) return;
         setElements((prev) => prev.filter((el) => el.id !== id));
         if (selectedElementId === id) setSelectedElementId(null);
         if (editingElementId === id) setEditingElementId(null);
@@ -134,15 +146,33 @@ export function CanvasEditor({ documentId, fileUrl, fileType = 'pdf', initialEle
         if (!isDirty) return;
         setIsSaving(true);
         try {
-            await fetch(`/api/documents/${documentId}`, {
+            const res = await fetch(`/api/documents/${documentId}`, {
                 method: "PUT",
                 body: JSON.stringify({ elements }),
                 headers: { "Content-Type": "application/json" }
             });
             setIsDirty(false);
+            if (res.ok) {
+                Swal.fire({
+                    icon: 'success',
+                    title: 'บันทึกสำเร็จ',
+                    showConfirmButton: false,
+                    timer: 1500
+                });
+            } else {
+                Swal.fire({
+                    icon: 'error',
+                    title: 'เกิดข้อผิดพลาด',
+                    text: 'ไม่สามารถบันทึกข้อมูลได้ กรุณาลองใหม่อีกครั้ง',
+                });
+            }
         } catch (err) {
             console.error("Save failed:", err);
-            alert("ไม่สามารถบันทึกข้อมูลได้ กรุณาลองใหม่อีกครั้ง");
+            Swal.fire({
+                icon: 'error',
+                title: 'เกิดข้อผิดพลาด',
+                text: 'ไม่สามารถบันทึกข้อมูลได้ กรุณาลองใหม่อีกครั้ง',
+            });
         } finally {
             setIsSaving(false);
         }

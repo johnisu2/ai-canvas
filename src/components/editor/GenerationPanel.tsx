@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { FileDown, Loader2, ChevronRight, ChevronLeft, Settings } from "lucide-react";
+import Swal from 'sweetalert2';
 import { cn } from "@/lib/utils";
 
 interface GenerationPanelProps {
@@ -42,11 +43,11 @@ export function GenerationPanel({ documentId }: GenerationPanelProps) {
                 window.URL.revokeObjectURL(url);
             } else {
                 console.error("Failed");
-                alert("Failed to generate PDF");
+                Swal.fire({ icon: 'error', title: 'Failed to generate PDF' });
             }
         } catch (e) {
             console.error(e);
-            alert("Invalid JSON or Error");
+            Swal.fire({ icon: 'error', title: 'Invalid JSON or Error' });
         } finally {
             setIsGenerating(false);
         }

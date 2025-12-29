@@ -16,16 +16,17 @@ export async function generatePdf(
     fileType: string = 'pdf'
 ) {
     // Helper to evaluate scripts safely
-    const evaluateScript = (script: string, data: any) => {
-        if (!script) return "";
+    const evaluateScript = (script: string, data: any, currentValue?: any) => {
+        if (!script) return currentValue || "";
         try {
+            const context = { ...data, value: currentValue };
             const trimmed = script.trim();
             const body = (trimmed.startsWith("return") || trimmed.includes(";"))
                 ? trimmed
                 : `return (${trimmed});`;
 
-            const fn = new Function('data', `try { ${body} } catch (e) { return "Error: " + e.message; }`);
-            const result = fn(data);
+            const fn = new Function('data', 'value', `try { ${body} } catch (e) { return "Error: " + e.message; }`);
+            const result = fn(context, currentValue);
             return result === undefined || result === null ? "" : String(result);
         } catch (e: any) {
             console.error(`[PDF Gen] Script evaluation failed: ${script}`, e);
@@ -209,37 +210,42 @@ export async function generatePdf(
             const page = pages[pageIndex];
             const { height: pageHeight } = page.getSize();
 
-            // Resolve Value Priority: Script > Formula > DB Mapping
-            let resolvedValue: string = "";
+            // Resolve Value: Chain (DB Mapping -> Formula -> Script)
+            let resolvedValue: any = "";
             const fieldName = element.fieldName;
 
-            // 1. Script (Top Priority)
-            if (element.script && dataContext) {
-                resolvedValue = evaluateScript(element.script, dataContext);
-                console.log(`[PDF Gen] Script evaluated for ${element.id}: "${resolvedValue}"`);
-            }
-            // 2. Formula (Second Priority)
-            else if (element.formula && dataContext) {
-                resolvedValue = evaluateScript(element.formula, dataContext); // Reuse evaluateScript for formulas
-                console.log(`[PDF Gen] Formula evaluated for ${element.id}: "${resolvedValue}"`);
-            }
-            // 3. Database Mapping (Fallback)
-            else if (dataContext && fieldName) {
+            // 1. Database Mapping (Base Value)
+            if (dataContext && fieldName) {
                 if (dataContext[fieldName] !== undefined) {
-                    resolvedValue = String(dataContext[fieldName]);
+                    resolvedValue = dataContext[fieldName];
                 } else if (fieldName.includes('.') && element.type !== 'table') {
                     const parts = fieldName.split('.');
                     const shortFieldName = parts[parts.length - 1];
                     if (dataContext[shortFieldName] !== undefined) {
-                        resolvedValue = String(dataContext[shortFieldName]);
+                        resolvedValue = dataContext[shortFieldName];
                     }
                 }
             }
 
-            if (!resolvedValue) {
+            // 2. Formula (Chain result from DB)
+            if (element.formula && dataContext) {
+                resolvedValue = evaluateScript(element.formula, dataContext, resolvedValue);
+                console.log(`[PDF Gen] Formula result for ${element.id}: "${resolvedValue}"`);
+            }
+
+            // 3. Script (Chain result from Formula/DB)
+            if (element.script && dataContext) {
+                resolvedValue = evaluateScript(element.script, dataContext, resolvedValue);
+                console.log(`[PDF Gen] Script result for ${element.id}: "${resolvedValue}"`);
+            }
+
+            if (resolvedValue === undefined || resolvedValue === null || resolvedValue === "") {
                 // Final fallback
                 resolvedValue = element.fieldValue || element.label || "";
             }
+
+            // Ensure string for remaining processing
+            resolvedValue = String(resolvedValue);
 
             // 3. Mustache replacement
             if (resolvedValue && typeof resolvedValue === 'string' && resolvedValue.includes("{{") && dataContext) {
@@ -321,8 +327,10 @@ export async function generatePdf(
                     }
                 }
             } else if (element.type === "table") {
-                const columns = Array.isArray(element.metadata) ? element.metadata : [];
-                console.log(`[PDF Gen] Table Metadata:`, columns);
+                const metadata = element.metadata || {};
+                const columns = Array.isArray(metadata) ? metadata : (metadata.columns || []);
+                const rowHeight = metadata.rowHeight || 22;
+                console.log(`[PDF Gen] Table columns:`, columns.length, "rowHeight:", rowHeight);
                 if (columns.length > 0) {
                     const tableKey = element.fieldName?.split('.')[0];
                     let tableData: any[] = [];
@@ -345,7 +353,7 @@ export async function generatePdf(
 
                     console.log(`[PDF Gen] Table Debug: key="Table", dataLength=${tableData.length}`);
 
-                    const rowHeight = 22;
+                    const rowHeight = element.metadata?.rowHeight || 22;
                     const fontSize = element.fontSize || 10;
                     let currentY = y;
 
