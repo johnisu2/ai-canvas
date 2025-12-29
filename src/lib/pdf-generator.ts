@@ -82,7 +82,18 @@ export async function generatePdf(
                 ? trimmed
                 : `return (${trimmed});`;
 
-            const fn = new Function('data', 'value', `try { ${body} } catch (e) { return "Error: " + e.message; }`);
+            // Inject top-level keys as variables for easier access
+            const keys = Object.keys(data).filter(k => /^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(k));
+            const destructure = keys.length > 0 ? `const { ${keys.join(', ')} } = data;` : '';
+
+            const fn = new Function('data', 'value', `
+                ${destructure}
+                try { 
+                    ${body} 
+                } catch (e) { 
+                    return "Error: " + e.message; 
+                }
+            `);
             const result = fn(context, currentValue);
             return result === undefined || result === null ? "" : String(result);
         } catch (e: any) {
@@ -99,16 +110,20 @@ export async function generatePdf(
 
         // DEBUG LOG
         console.log(`[PDF Gen] Running Formula: "${formula}"`);
-        // console.log(`[PDF Gen] Formula Data Context Keys:`, Object.keys(data));
 
         try {
             const expr = formula.trim();
+
+            // Inject top-level keys as variables for easier access (e.g. data.patients -> patients)
+            const keys = Object.keys(data).filter(k => /^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(k));
+            const destructure = keys.length > 0 ? `const { ${keys.join(', ')} } = data;` : '';
 
             const fn = new Function(
                 "data",
                 "value",
                 `
             "use strict";
+            ${destructure}
             try {
                 const result = (${expr});
                 if (Number.isNaN(result) || result === undefined || result === null) {
