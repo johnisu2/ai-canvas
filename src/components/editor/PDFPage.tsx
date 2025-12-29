@@ -128,10 +128,22 @@ export function PDFPage({
 
             {/* Grid Layer */}
             {showGrid && (
+                <div
+                    className="absolute inset-0 pointer-events-none opacity-40 z-10"
+                    style={{
+                        backgroundImage: `
+                                                    linear-gradient(to right, rgba(0,0,0,0.6) 1px, transparent 1px),
+                                                    linear-gradient(to bottom, rgba(0,0,0,0.6) 1px, transparent 1px)
+                                                `,
+                        backgroundSize: `20px 20px`,
+                    }}
+                />
+            )}
+            {/* {showGrid && (
                 <div className="absolute inset-0 pointer-events-none opacity-20 z-10"
                     style={{ backgroundImage: `radial-gradient(circle, #6366f1 1px, transparent 1px)`, backgroundSize: `${20}px ${20}px` }}>
                 </div>
-            )}
+            )} */}
 
             {/* Elements Rendering Layer */}
             <div className="absolute inset-0 w-full h-full"
