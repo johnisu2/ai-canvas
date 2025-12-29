@@ -15,6 +15,11 @@ export async function generatePdf(
     dataContext: any,
     fileType: string = 'pdf'
 ) {
+    console.log("[PDF Gen] Generating PDF for file: ", fileUrl);
+    console.log("[PDF Gen] Generating PDF for elements: ", elements);
+    console.log("[PDF Gen] Generating PDF for dataContext: ", dataContext);
+    console.log("[PDF Gen] Generating PDF for fileType: ", fileType);
+
     // Helper to evaluate scripts safely
     const evaluateScript = (script: string, data: any, currentValue?: any) => {
         if (!script) return currentValue || "";

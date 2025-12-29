@@ -147,9 +147,9 @@ export const ElementRenderer = memo(function ElementRenderer({ element, scale, i
                             {element.type === 'signature' && element.fieldValue && (
                                 <img src={element.fieldValue} className="w-full h-full object-contain" alt="" />
                             )}
-                            {element.type === 'qr' && (
+                            {element.type === 'qr' && element.fieldValue && (
                                 <div className="w-full h-full flex items-center justify-center p-1">
-                                    {(element.fieldValue?.startsWith('data:image') || element.fieldValue?.startsWith('/'))
+                                    {(element.fieldValue.startsWith('data:image') || element.fieldValue.startsWith('/'))
                                         ? <img src={element.fieldValue} className="w-full h-full object-contain" alt="" />
                                         : <img src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(element.fieldValue || '')}`} className="w-full h-full object-contain" alt="" />
                                     }
@@ -255,8 +255,10 @@ export const ElementRenderer = memo(function ElementRenderer({ element, scale, i
                                 </div>
                             )}
 
-                            {((element.type === 'image' || element.type === 'signature') && !element.fieldValue) && (
-                                <div className="flex-1 flex flex-col items-center justify-center text-slate-300 opacity-50"><ImageIcon className="w-8 h-8" /></div>
+                            {((element.type === 'image' || element.type === 'signature' || element.type === 'qr') && !element.fieldValue) && (
+                                <div className="flex-1 flex flex-col items-center justify-center text-slate-300 opacity-50">
+                                    {element.type === 'qr' ? <QrCode className="w-8 h-8" /> : <ImageIcon className="w-8 h-8" />}
+                                </div>
                             )}
                         </div>
                     </div>

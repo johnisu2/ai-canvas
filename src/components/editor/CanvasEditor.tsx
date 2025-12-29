@@ -103,13 +103,23 @@ export function CanvasEditor({ documentId, fileUrl, fileType = 'pdf', initialEle
 
 
     const handleAddElement = useCallback((pageNumber: number, type: ElementType, x: number, y: number) => {
+        // Default sizes based on type
+        const defaults: Record<string, { w: number, h: number }> = {
+            text: { w: 150, h: 40 },
+            qr: { w: 100, h: 100 },
+            image: { w: 150, h: 150 },
+            table: { w: 350, h: 120 },
+            signature: { w: 150, h: 60 }
+        };
+        const size = defaults[type as string] || { w: 150, h: 50 };
+
         const newElement: CanvasElement = {
             id: uuidv4(),
             type,
             x,
             y,
-            width: 150,
-            height: 50,
+            width: size.w,
+            height: size.h,
             pageNumber,
         };
         setElements((prev) => [...prev, newElement]);
