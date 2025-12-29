@@ -90,6 +90,39 @@ export async function generatePdf(
             return "Script Error";
         }
     };
+    const runFormula = (
+        formula: string,
+        data: Record<string, any>,
+        currentValue?: any
+    ): any => {
+        if (!formula || typeof formula !== "string") return currentValue ?? "";
+
+        try {
+            const expr = formula.trim();
+
+            const fn = new Function(
+                "data",
+                "value",
+                `
+            "use strict";
+            try {
+                const result = (${expr});
+                if (Number.isNaN(result) || result === undefined || result === null) {
+                    return "";
+                }
+                return result;
+            } catch (err) {
+                return "";
+            }
+        `
+            );
+
+            return fn(data, currentValue);
+        } catch (err) {
+            console.error("[PDF Gen] Formula compile error:", formula, err);
+            return "";
+        }
+    };
 
 
     // Helper to fetch image bytes
@@ -376,7 +409,7 @@ export async function generatePdf(
 
             // 2. Formula
             if (element.formula && dataContext) {
-                resolvedValue = evaluateScript(element.formula, dataContext, resolvedValue);
+                resolvedValue = runFormula(element.formula, dataContext, resolvedValue);
                 console.log(`[PDF Gen] Formula result: "${resolvedValue}"`);
             }
 
