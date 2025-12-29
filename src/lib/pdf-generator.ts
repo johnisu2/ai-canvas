@@ -152,8 +152,8 @@ export async function generatePdf(
     // Determine number of pages
     const totalPages = pdfDoc.getPageCount();
 
-    // Helper to draw text with font switching
-    const drawRichText = (page: any, text: string, x: number, y: number, fontSize: number, rotation: number = 0) => {
+    // Helper to draw text with font switching and optional truncation
+    const drawRichText = (page: any, text: string, x: number, y: number, fontSize: number, rotation: number = 0, maxWidth?: number) => {
         const rad = (rotation * Math.PI) / 180;
         let currentX = x;
         let currentY = y;
@@ -166,16 +166,31 @@ export async function generatePdf(
 
         if (text.length === 0) return;
 
-        let segments: { text: string; font: PDFFont }[] = [];
-        let currentSegment = { text: text[0], font: getFontForChar(text[0]) };
+        let processedText = text;
+        if (maxWidth && maxWidth > 0) {
+            let widthSum = 0;
+            let truncated = "";
+            for (const char of text) {
+                const charWidth = getFontForChar(char).widthOfTextAtSize(char, fontSize);
+                if (widthSum + charWidth > maxWidth) break;
+                widthSum += charWidth;
+                truncated += char;
+            }
+            processedText = truncated;
+        }
 
-        for (let i = 1; i < text.length; i++) {
-            const font = getFontForChar(text[i]);
+        if (processedText.length === 0) return;
+
+        let segments: { text: string; font: PDFFont }[] = [];
+        let currentSegment = { text: processedText[0], font: getFontForChar(processedText[0]) };
+
+        for (let i = 1; i < processedText.length; i++) {
+            const font = getFontForChar(processedText[i]);
             if (font === currentSegment.font) {
-                currentSegment.text += text[i];
+                currentSegment.text += processedText[i];
             } else {
                 segments.push(currentSegment);
-                currentSegment = { text: text[i], font };
+                currentSegment = { text: processedText[i], font };
             }
         }
         segments.push(currentSegment);
@@ -360,23 +375,76 @@ export async function generatePdf(
                         const rowData = tableData[i];
                         const rowVisualTop = element.y + (i * rowHeight);
                         if ((i + 1) * rowHeight > element.height) break;
+
                         let currentColX = element.x;
                         for (const col of columns) {
                             const colWidthPercent = parseFloat(col.width) || (100 / columns.length);
                             const colWidth = (colWidthPercent / 100) * element.width;
+
+                            // [NEW VERSION] ปรับให้ข้อความไม่เลยกรอบ (Truncate if overflow)
+                            // คำนวณค่า Cell และตัดข้อความหากยาวเกิน colWidth (ลบ padding นิดหน่อย)
                             let cellValue = rowData[col.field] !== undefined ? String(rowData[col.field]) : "";
                             if (col.script) cellValue = evaluateScript(col.script, rowData);
 
-                            const textWidth = sarabunFont.widthOfTextAtSize(cellValue, fontSize);
-                            let uX = currentColX + 5;
-                            if (element.alignment === 'center') {
-                                uX = currentColX + (colWidth - textWidth) / 2;
-                            } else if (element.alignment === 'right') {
-                                uX = currentColX + colWidth - textWidth - 5;
+                            const padding = 10; // Left 5 + Right 5
+                            const maxTextWidth = colWidth - padding;
+
+                            // หาความกว้างจริงเพื่อใช้จัด Alignment (หลังตัดข้อความ)
+                            const getActualWidth = (t: string) => {
+                                let wSum = 0;
+                                for (const char of t) {
+                                    const code = char.charCodeAt(0);
+                                    const font = code > 0x2000 ? symbolsFont : sarabunFont;
+                                    wSum += font.widthOfTextAtSize(char, fontSize);
+                                }
+                                return wSum;
+                            };
+
+                            // ตัดข้อความก่อนเพื่อคำนวณตำแหน่ง Alignment ที่ถูกต้อง
+                            let truncatedVal = cellValue;
+                            let currentW = 0;
+                            let fitText = "";
+                            for (const char of cellValue) {
+                                const code = char.charCodeAt(0);
+                                const font = code > 0x2000 ? symbolsFont : sarabunFont;
+                                const charW = font.widthOfTextAtSize(char, fontSize);
+                                if (currentW + charW > maxTextWidth) break;
+                                fitText += char;
+                                currentW += charW;
                             }
+                            truncatedVal = fitText;
+
+                            const textActualWidth = currentW;
+                            let uX = currentColX + 5; // Left Padding 5
+                            if (element.alignment === 'center') {
+                                uX = currentColX + (colWidth - textActualWidth) / 2;
+                            } else if (element.alignment === 'right') {
+                                uX = currentColX + colWidth - textActualWidth - 5;
+                            }
+
                             const uY = (pageHeight - rowVisualTop) - (rowHeight / 2) - (fontSize * 0.15);
                             const pos = rotatePoint(uX, uY);
-                            drawRichText(page, cellValue, pos.x, pos.y, fontSize, pdfRotDeg);
+
+                            // วาดข้อความที่ตัดแล้ว
+                            drawRichText(page, truncatedVal, pos.x, pos.y, fontSize, pdfRotDeg);
+
+                            /*
+                            //  แบบข้อความเลยกรอบได้ V1
+                            let cellValueOld = rowData[col.field] !== undefined ? String(rowData[col.field]) : "";
+                            if (col.script) cellValueOld = evaluateScript(col.script, rowData);
+
+                            const textWidthOld = sarabunFont.widthOfTextAtSize(cellValueOld, fontSize);
+                            let uXOld = currentColX + 5;
+                            if (element.alignment === 'center') {
+                                uXOld = currentColX + (colWidth - textWidthOld) / 2;
+                            } else if (element.alignment === 'right') {
+                                uXOld = currentColX + colWidth - textWidthOld - 5;
+                            }
+                            const uYOld = (pageHeight - rowVisualTop) - (rowHeight / 2) - (fontSize * 0.15);
+                            const posOld = rotatePoint(uXOld, uYOld);
+                            drawRichText(page, cellValueOld, posOld.x, posOld.y, fontSize, pdfRotDeg);
+                            */
+
                             currentColX += colWidth;
                         }
                     }
