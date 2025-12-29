@@ -1,4 +1,4 @@
-import { PDFDocument, rgb, PDFFont, radians } from "pdf-lib";
+import { PDFDocument, rgb, PDFFont, radians, degrees } from "pdf-lib";
 import fontkit from "@pdf-lib/fontkit";
 import QRCode from "qrcode";
 import { readFile } from "fs/promises";
@@ -162,8 +162,9 @@ export async function generatePdf(
 
     // Helper to draw text with font switching
     const drawRichText = (page: any, text: string, x: number, y: number, fontSize: number, rotation: number = 0) => {
-        let currentX = x;
         const rad = (rotation * Math.PI) / 180;
+        let currentX = x;
+        let currentY = y;
 
         const getFontForChar = (char: string): PDFFont => {
             const code = char.charCodeAt(0);
@@ -190,13 +191,17 @@ export async function generatePdf(
         for (const segment of segments) {
             page.drawText(segment.text, {
                 x: currentX,
-                y: y,
+                y: currentY,
                 size: fontSize,
                 font: segment.font,
                 color: rgb(0, 0, 0),
-                rotate: radians(rotation)
+                rotate: degrees(rotation)
             });
-            currentX += segment.font.widthOfTextAtSize(segment.text, fontSize);
+            const segmentWidth = segment.font.widthOfTextAtSize(segment.text, fontSize);
+            // Move currentX and currentY along the rotated vector
+            // pdf-lib rotation is counter-clockwise, radians() handles the sign
+            currentX += segmentWidth * Math.cos(rad);
+            currentY += segmentWidth * Math.sin(rad);
         }
     };
 
@@ -255,30 +260,42 @@ export async function generatePdf(
                 });
             }
 
-            // Common properties
-            const x = element.x;
-            const y = pageHeight - element.y;
-            const rotationDegrees = element.rotation || 0;
-            const rad = (rotationDegrees * Math.PI) / 180;
+            // Geometry & Center-based Rotation Logic
+            const w = element.width;
+            const h = element.height;
+            const rotDeg = element.rotation || 0; // CW in Editor
+            const pdfRotDeg = -rotDeg; // pdf-lib uses CCW
+
+            const cx = element.x + w / 2;
+            const cy = pageHeight - (element.y + h / 2);
+
+            const rotatePoint = (px: number, py: number) => {
+                if (rotDeg === 0) return { x: px, y: py };
+                const r = (pdfRotDeg * Math.PI) / 180;
+                const dx = px - cx;
+                const dy = py - cy;
+                return {
+                    x: cx + dx * Math.cos(r) - dy * Math.sin(r),
+                    y: cy + dx * Math.sin(r) + dy * Math.cos(r)
+                };
+            };
 
             if (element.type === "text") {
                 const fontSize = element.fontSize || 14;
-                // Calculate vertical center:
-                // Middle of box = y - (element.height / 2)
-                // Adjustment for baseline ~ (fontSize / 3)
-                const centeredY = y - (element.height / 2) - (fontSize / 3);
+                const align = element.alignment || 'left';
 
-                // Add padding to x to match 'px-2' (approx 8px)
-                const paddedX = x + 8;
+                let unrotatedX = element.x + 8;
+                const textWidth = sarabunFont.widthOfTextAtSize(resolvedValue, fontSize);
+                if (align === 'center') {
+                    unrotatedX = element.x + (w - textWidth) / 2;
+                } else if (align === 'right') {
+                    unrotatedX = element.x + w - textWidth - 8;
+                }
 
-                drawRichText(
-                    page,
-                    resolvedValue || "",
-                    paddedX,
-                    centeredY,
-                    fontSize,
-                    rotationDegrees
-                );
+                const unrotatedY = (pageHeight - (element.y + h / 2)) - (fontSize * 0.15);
+                const pos = rotatePoint(unrotatedX, unrotatedY);
+
+                drawRichText(page, resolvedValue, pos.x, pos.y, fontSize, pdfRotDeg);
             } else if (element.type === "qr") {
                 const qrValue = resolvedValue || "";
                 let image;
@@ -298,11 +315,13 @@ export async function generatePdf(
                 }
 
                 if (image) {
-                    page.drawImage(image, { x, y: y - element.height, width: element.width, height: element.height, rotate: radians(rad) });
+                    const pos = rotatePoint(element.x, (pageHeight - element.y) - h);
+                    page.drawImage(image, { x: pos.x, y: pos.y, width: w, height: h, rotate: degrees(pdfRotDeg) });
                 } else {
                     const qrDataUrl = await QRCode.toDataURL(qrValue || " ");
                     const qrImage = await pdfDoc.embedPng(qrDataUrl);
-                    page.drawImage(qrImage, { x, y: y - element.height, width: element.width, height: element.height, rotate: radians(rad) });
+                    const pos = rotatePoint(element.x, (pageHeight - element.y) - h);
+                    page.drawImage(qrImage, { x: pos.x, y: pos.y, width: w, height: h, rotate: degrees(pdfRotDeg) });
                 }
             } else if (element.type === "image" || element.type === "signature") {
                 if (resolvedValue && (resolvedValue.startsWith("data:image") || resolvedValue.startsWith("http") || resolvedValue.startsWith("/"))) {
@@ -322,7 +341,8 @@ export async function generatePdf(
                         } catch (e) { console.error("Embedding failed", e); }
 
                         if (image) {
-                            page.drawImage(image, { x, y: y - element.height, width: element.width, height: element.height, rotate: radians(rad) });
+                            const pos = rotatePoint(element.x, (pageHeight - element.y) - h);
+                            page.drawImage(image, { x: pos.x, y: pos.y, width: w, height: h, rotate: degrees(pdfRotDeg) });
                         }
                     }
                 }
@@ -330,71 +350,34 @@ export async function generatePdf(
                 const metadata = element.metadata || {};
                 const columns = Array.isArray(metadata) ? metadata : (metadata.columns || []);
                 const rowHeight = metadata.rowHeight || 22;
-                console.log(`[PDF Gen] Table columns:`, columns.length, "rowHeight:", rowHeight);
                 if (columns.length > 0) {
                     const tableKey = element.fieldName?.split('.')[0];
-                    let tableData: any[] = [];
-                    console.log(`[PDF Gen] tableKey:`, columns);
-
-                    console.log(`[PDF Gen] Table Processing: Element ID=${element.id}, FieldName="${element.fieldName}"`);
-                    console.log(`[PDF Gen] Available Keys in DataContext:`, Object.keys(dataContext || {}));
-
-                    // Fallback to "Table" only if tableKey is null/undefined/empty string
-                    // const keyToUse = "Table";
                     const keyToUse = tableKey || "Table";
-                    console.log(`[PDF Gen] Looking for data with key: "${keyToUse}"`);
-
-                    if (dataContext && Array.isArray(dataContext[keyToUse])) {
-                        tableData = dataContext[keyToUse];
-                        console.log(`[PDF Gen] Found data for "${keyToUse}". Rows: ${tableData.length}`);
-                    } else {
-                        console.warn(`[PDF Gen] Data NOT found or not an array for key: "${keyToUse}". Value:`, dataContext ? dataContext[keyToUse] : "No Context");
-                    }
-
-                    console.log(`[PDF Gen] Table Debug: key="Table", dataLength=${tableData.length}`);
-
-                    const rowHeight = element.metadata?.rowHeight || 22;
+                    const tableData = (dataContext && Array.isArray(dataContext[keyToUse])) ? dataContext[keyToUse] : [];
                     const fontSize = element.fontSize || 10;
-                    let currentY = y;
 
-                    // Draw Table Body
                     for (let i = 0; i < tableData.length; i++) {
                         const rowData = tableData[i];
-                        let currentX = x;
-
-                        if (i * rowHeight > element.height) break;
-                        const rowY = currentY - (i * rowHeight);
-
-                        // Row Border
-                        // page.drawRectangle({
-                        //     x: x,
-                        //     y: rowY - rowHeight,
-                        //     width: element.width,
-                        //     height: rowHeight,
-                        //     borderWidth: 0.5,
-                        //     borderColor: rgb(0.7, 0.7, 0.7),
-                        // });
-
+                        const rowVisualTop = element.y + (i * rowHeight);
+                        if ((i + 1) * rowHeight > element.height) break;
+                        let currentColX = element.x;
                         for (const col of columns) {
                             const colWidthPercent = parseFloat(col.width) || (100 / columns.length);
                             const colWidth = (colWidthPercent / 100) * element.width;
-
                             let cellValue = rowData[col.field] !== undefined ? String(rowData[col.field]) : "";
+                            if (col.script) cellValue = evaluateScript(col.script, rowData);
 
-                            // Cell Script Evaluation
-                            if (col.script) {
-                                cellValue = evaluateScript(col.script, rowData);
+                            const textWidth = sarabunFont.widthOfTextAtSize(cellValue, fontSize);
+                            let uX = currentColX + 5;
+                            if (element.alignment === 'center') {
+                                uX = currentColX + (colWidth - textWidth) / 2;
+                            } else if (element.alignment === 'right') {
+                                uX = currentColX + colWidth - textWidth - 5;
                             }
-
-                            drawRichText(
-                                page,
-                                cellValue,
-                                currentX + 5,
-                                rowY - (rowHeight / 2) - (fontSize / 3),
-                                fontSize
-                            );
-
-                            currentX += colWidth;
+                            const uY = (pageHeight - rowVisualTop) - (rowHeight / 2) - (fontSize * 0.15);
+                            const pos = rotatePoint(uX, uY);
+                            drawRichText(page, cellValue, pos.x, pos.y, fontSize, pdfRotDeg);
+                            currentColX += colWidth;
                         }
                     }
                 }
