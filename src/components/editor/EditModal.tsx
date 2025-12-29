@@ -380,36 +380,39 @@ export function EditModal({ element, isOpen, onClose, onSave, onChange, onDelete
 
                     return (
                         <div className="space-y-4 border-t pt-4 mt-4">
-                            <div className="grid grid-cols-2 gap-4 mb-4">
-                                <div className="col-span-1">
+                            <div className="flex justify-between items-end gap-4 mb-3">
+                                <div className="flex-1">
                                     <label className="block text-sm font-medium text-slate-700 mb-1">
-                                        ความสูงของแถว (Row Height)
+                                        ลำดับคอลัมน์ (Columns)
                                     </label>
-                                    <input
-                                        type="number"
-                                        value={rowHeight}
-                                        onChange={e => {
-                                            const val = parseInt(e.target.value) || 22;
-                                            handleChange("metadata", { columns, rowHeight: val });
-                                        }}
-                                        className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
-                                        placeholder="ค่าเริ่มต้น 22"
-                                    />
+                                    <div className="text-[10px] text-slate-400">กำหนดรายการข้อมูลที่จะแสดงในตาราง</div>
                                 </div>
-                            </div>
 
-                            <div className="flex justify-between items-center mb-2">
-                                <label className="block text-sm font-medium text-slate-700">ลำดับคอลัมน์ (Columns)</label>
-                                <button
-                                    type="button"
-                                    onClick={() => {
-                                        const newCols = [...columns, { header: 'คอลัมน์ใหม่', field: '', width: '' }];
-                                        handleChange("metadata", { columns: newCols, rowHeight });
-                                    }}
-                                    className="text-xs bg-indigo-600 text-white px-3 py-1.5 rounded-lg hover:bg-indigo-700 font-medium transition-colors"
-                                >
-                                    + เพิ่มคอลัมน์
-                                </button>
+                                <div className="flex items-center gap-3">
+                                    <div className="flex flex-col items-end gap-1">
+                                        <label className="text-[10px] font-medium text-slate-500">สูงแถว (Row H)</label>
+                                        <input
+                                            type="number"
+                                            value={rowHeight}
+                                            onChange={e => {
+                                                const val = parseInt(e.target.value) || 22;
+                                                handleChange("metadata", { columns, rowHeight: val });
+                                            }}
+                                            className="w-16 px-2 py-1.5 border rounded-lg text-xs focus:ring-2 focus:ring-indigo-500 outline-none text-center font-mono"
+                                            placeholder="22"
+                                        />
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            const newCols = [...columns, { header: 'คอลัมน์ใหม่', field: '', width: '' }];
+                                            handleChange("metadata", { columns: newCols, rowHeight });
+                                        }}
+                                        className="h-9 px-4 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-medium transition-colors text-xs flex items-center gap-1.5 shadow-sm"
+                                    >
+                                        <Grid className="w-3.5 h-3.5" /> เพิ่มคอลัมน์
+                                    </button>
+                                </div>
                             </div>
 
                             <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
