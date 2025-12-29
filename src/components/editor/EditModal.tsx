@@ -295,7 +295,7 @@ export function EditModal({ element, isOpen, onClose, onSave, onChange, onDelete
                                 value={formData.formula || ""}
                                 onChange={e => handleChange("formula", e.target.value)}
                                 className="w-full px-3 py-2 border border-indigo-100 rounded-lg font-mono text-sm bg-indigo-50/30 focus:bg-white focus:ring-2 focus:ring-indigo-500 outline-none"
-                                placeholder="เช่น data.amount * data.qty"
+                                placeholder="เช่น data.patients.amount * 5"
                             />
                         </div>
 
