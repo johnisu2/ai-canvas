@@ -24,51 +24,9 @@ export default function Home() {
   const [documents, setDocuments] = useState<Document[]>([]);
   const [selectedDocId, setSelectedDocId] = useState<string>("");
   const [jsonInput, setJsonInput] = useState(JSON.stringify({
-    "first_name": "สมชาย",
-    "image": "/uploads/mock_patient.png",
-    "amount": 30,
-    "prescription_items": [
-      {
-        "rx_no": "RX-2024-001",
-        "drug_code": "D001",
-        "qty": 20,
-        "amount": 30
-      },
-      {
-        "rx_no": "RX-2024-002",
-        "drug_code": "D002",
-        "qty": 10,
-        "amount": 50
-      }
-    ],
-    "patients": [
-      {
-        "hn": "HN001",
-        "first_name": "สมชาย",
-        "last_name": "ใจดี",
-        "gender": "ชาย",
-        "phone": "081-234-5678",
-        "address": "123 ถ.สุขุมวิท กทม.",
-        "dob": "1985-05-20",
-        "blood_group": "O",
-        "id_card": "1-1001-01234-56-7",
-        "allergies": "Penicillin",
-        "image": "/uploads/mock_patient.png"
-      },
-      {
-        "hn": "HN002",
-        "first_name": "สมหญิง",
-        "last_name": "รักเรียน",
-        "gender": "หญิง",
-        "phone": "089-876-5432",
-        "address": "456/7 ซ.อารีย์ ถ.พหลโยธิน กทม.",
-        "dob": "1992-11-12",
-        "blood_group": "AB",
-        "id_card": "3-2101-00456-78-9",
-        "allergies": "ไม่มี",
-        "image": "/uploads/mock_patient_2.png"
-      }
-    ]
+    "hn": "HN001",
+    "code": "D001",
+    "hns": ""
   }, null, 2));
   const [isGenerating, setIsGenerating] = useState(false);
 
