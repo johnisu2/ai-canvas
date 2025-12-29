@@ -1,7 +1,7 @@
 "use client";
 
 import { CanvasElement, ElementType } from "@/types/canvas";
-import { X, Save, Trash2, Code, Calculator, Type, Grid, ImageIcon, PenTool } from "lucide-react";
+import { X, Save, Trash2, Code, Calculator, Type, Grid, ImageIcon, PenTool, Database } from "lucide-react";
 import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
 import { SignatureInput } from "./SignatureInput";
@@ -228,8 +228,8 @@ export function EditModal({ element, isOpen, onClose, onSave, onChange, onDelete
 
                 {/* DB Field Map - Dropdowns */}
                 <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">
-                        {element.type === 'table' ? 'เชื่อมต่อตารางข้อมูล (Database Table Mapping)' : 'เชื่อมต่อฐานข้อมูล (Database Mapping)'}
+                    <label className="block text-sm font-medium text-slate-700 mb-1 flex items-center gap-2">
+                        <Database className="w-3 h-3 text-slate-500" /> เชื่อมต่อฐานข้อมูล (Database Mapping)
                     </label>
                     <div className={cn("grid gap-2", element.type === 'table' ? "grid-cols-1" : "grid-cols-2")}>
                         {/* Table Selector */}
@@ -246,16 +246,6 @@ export function EditModal({ element, isOpen, onClose, onSave, onChange, onDelete
                                     </option>
                                 ))}
                             </select>
-                            {/* Manual Override for Table Name (only if no DB table selected or to show current) */}
-                            {/* {element.type === 'table' && !selectedTableId && (
-                                <input
-                                    type="text"
-                                    placeholder="ระบุ Key ใน JSON (เช่น Table, prescription_items)"
-                                    value={formData.fieldName || ""}
-                                    onChange={(e) => handleChange("fieldName", e.target.value)}
-                                    className="px-3 py-2 border rounded-lg text-sm bg-slate-50 outline-none focus:ring-2 focus:ring-indigo-500 font-mono text-indigo-700"
-                                />
-                            )} */}
                         </div>
 
                         {/* Field Selector (Hidden for Tables) */}
@@ -275,60 +265,60 @@ export function EditModal({ element, isOpen, onClose, onSave, onChange, onDelete
                     </div>
                 </div>
 
-                {/* Type Specifics */}
+
+                {/* Formula */}
+                <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1 flex items-center gap-2">
+                        <Calculator className="w-3 h-3 text-indigo-600" />  สูตรคำนวณ
+                    </label>
+                    <input
+                        type="text"
+                        value={formData.formula || ""}
+                        onChange={e => handleChange("formula", e.target.value)}
+                        className="w-full px-3 py-2 border border-indigo-100 rounded-lg font-mono text-sm bg-indigo-50/30 focus:bg-white focus:ring-2 focus:ring-indigo-500 outline-none"
+                        placeholder="เช่น data.amount * data.qty"
+                    />
+                </div>
+
+                {/* Script */}
+                <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1 flex items-center gap-2">
+                        <Code className="w-3 h-3 text-purple-600" /> สคริปต์ / เงื่อนไข
+                    </label>
+                    <textarea
+                        value={formData.script || ""}
+                        onChange={e => handleChange("script", e.target.value)}
+                        className="w-full px-3 py-2 border border-purple-100 rounded-lg font-mono text-sm h-20 focus:ring-2 focus:ring-purple-500 outline-none"
+                        placeholder="เช่น return data.total > 1000 ? 'ยอดเยี่ยม' : 'ปกติ';"
+                    />
+                </div>
+
+
+                {/* Type Specifics (FontSize etc) */}
                 {element.type === "text" && (
-                    <>
-                        <div className="grid grid-cols-2 gap-4">
-                            <div>
-                                <label className="block text-sm font-medium text-slate-700 mb-1">ขนาดตัวอักษร</label>
-                                <input
-                                    type="number"
-                                    value={formData.fontSize || 14}
-                                    onChange={e => handleChange("fontSize", parseInt(e.target.value))}
-                                    className="w-full px-3 py-2 border rounded-lg"
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-slate-700 mb-1">การจัดวาง</label>
-                                <select
-                                    value={formData.alignment || "left"}
-                                    onChange={e => handleChange("alignment", e.target.value)}
-                                    className="w-full px-3 py-2 border rounded-lg bg-white"
-                                >
-                                    <option value="left">ชิดซ้าย</option>
-                                    <option value="center">กึ่งกลาง</option>
-                                    <option value="right">ชิดขวา</option>
-                                </select>
-                            </div>
-                        </div>
-
-                        {/* Formula */}
+                    <div className="grid grid-cols-2 gap-4">
                         <div>
-                            <label className="block text-sm font-medium text-slate-700 mb-1 flex items-center gap-2">
-                                <Calculator className="w-3 h-3" /> สูตรคำนวณ (เช่น ราคาสินค้า * จำนวน)
-                            </label>
+                            <label className="block text-sm font-medium text-slate-700 mb-1">ขนาดตัวอักษร</label>
                             <input
-                                type="text"
-                                value={formData.formula || ""}
-                                onChange={e => handleChange("formula", e.target.value)}
-                                className="w-full px-3 py-2 border rounded-lg font-mono text-sm bg-indigo-50/50 border-indigo-200 focus:bg-white"
-                                placeholder="เช่น price * qty"
+                                type="number"
+                                value={formData.fontSize || 14}
+                                onChange={e => handleChange("fontSize", parseInt(e.target.value))}
+                                className="w-full px-3 py-2 border rounded-lg"
                             />
                         </div>
-
-                        {/* Script */}
                         <div>
-                            <label className="block text-sm font-medium text-slate-700 mb-1 flex items-center gap-2">
-                                <Code className="w-3 h-3" /> สคริปต์ / เงื่อนไข (JavaScript)
-                            </label>
-                            <textarea
-                                value={formData.script || ""}
-                                onChange={e => handleChange("script", e.target.value)}
-                                className="w-full px-3 py-2 border rounded-lg font-mono text-sm h-20"
-                                placeholder="return data.value > 10;"
-                            />
+                            <label className="block text-sm font-medium text-slate-700 mb-1">การจัดวาง</label>
+                            <select
+                                value={formData.alignment || "left"}
+                                onChange={e => handleChange("alignment", e.target.value)}
+                                className="w-full px-3 py-2 border rounded-lg bg-white"
+                            >
+                                <option value="left">ชิดซ้าย</option>
+                                <option value="center">กึ่งกลาง</option>
+                                <option value="right">ชิดขวา</option>
+                            </select>
                         </div>
-                    </>
+                    </div>
                 )}
 
                 {(element.type === "qr" || element.type === "image") && (

@@ -33,6 +33,7 @@ export async function generatePdf(
         }
     };
 
+
     // Helper to fetch image bytes
     const fetchImageBytes = async (urlOrBase64: string): Promise<Uint8Array | null> => {
         try {
@@ -208,17 +209,22 @@ export async function generatePdf(
             const page = pages[pageIndex];
             const { height: pageHeight } = page.getSize();
 
-            // Resolve Value
-            let value = element.fieldValue || element.label || "";
+            // Resolve Value Priority: Script > Formula > DB Mapping
+            let resolvedValue: string = "";
             const fieldName = element.fieldName;
 
-            console.log(`[PDF Gen] Processing Element: ${element.id}, Type: ${element.type}, fieldName: "${fieldName}"`);
-
-            // Robust Mapping Logic
-            let resolvedValue = value;
-
-            // 1. Try direct fieldName match
-            if (dataContext && fieldName) {
+            // 1. Script (Top Priority)
+            if (element.script && dataContext) {
+                resolvedValue = evaluateScript(element.script, dataContext);
+                console.log(`[PDF Gen] Script evaluated for ${element.id}: "${resolvedValue}"`);
+            }
+            // 2. Formula (Second Priority)
+            else if (element.formula && dataContext) {
+                resolvedValue = evaluateScript(element.formula, dataContext); // Reuse evaluateScript for formulas
+                console.log(`[PDF Gen] Formula evaluated for ${element.id}: "${resolvedValue}"`);
+            }
+            // 3. Database Mapping (Fallback)
+            else if (dataContext && fieldName) {
                 if (dataContext[fieldName] !== undefined) {
                     resolvedValue = String(dataContext[fieldName]);
                 } else if (fieldName.includes('.') && element.type !== 'table') {
@@ -230,10 +236,9 @@ export async function generatePdf(
                 }
             }
 
-            // 2. Script Evaluation (Priority over mapping)
-            if (element.script && dataContext) {
-                resolvedValue = evaluateScript(element.script, dataContext);
-                console.log(`[PDF Gen] Script evaluated for ${element.id}: "${resolvedValue}"`);
+            if (!resolvedValue) {
+                // Final fallback
+                resolvedValue = element.fieldValue || element.label || "";
             }
 
             // 3. Mustache replacement

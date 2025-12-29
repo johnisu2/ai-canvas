@@ -25,6 +25,7 @@ export default function Home() {
   const [jsonInput, setJsonInput] = useState(JSON.stringify({
     "first_name": "สมชาย",
     "image": "/uploads/mock_patient.png",
+    "amount": 30,
     "prescription_items": [
       {
         "rx_no": "RX-2024-001",

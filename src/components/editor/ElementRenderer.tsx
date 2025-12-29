@@ -238,7 +238,12 @@ export const ElementRenderer = memo(function ElementRenderer({ element, scale, i
                             {element.type === 'text' && (
                                 <div className={cn("flex-1 flex items-center px-2", element.alignment === 'center' && "justify-center text-center", element.alignment === 'right' && "justify-end text-right")}>
                                     <span className="truncate w-full font-semibold text-slate-800" style={{ fontSize: element.fontSize ? `${element.fontSize}px` : '14px' }}>
-                                        {element.label || element.fieldName || "เพิ่มข้อความ..."}
+                                        {element.script
+                                            ? <span className="text-purple-600 flex items-center gap-1">{"{}"} Script</span>
+                                            : element.formula
+                                                ? <span className="text-indigo-600 flex items-center gap-1">{"="} Formula</span>
+                                                : (element.label || element.fieldName || "เพิ่มข้อความ...")
+                                        }
                                     </span>
                                 </div>
                             )}
