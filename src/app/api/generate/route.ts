@@ -45,7 +45,7 @@ export async function POST(request: NextRequest) {
                 },
             })
 
-            findProcedure.forEach(async (table) => {
+            for (const table of findProcedure) {
                 if (table.procedureName) {
                     try {
                         const params: any = [];
@@ -53,7 +53,7 @@ export async function POST(request: NextRequest) {
                             params.push(json[param.paramName] || null);
                         });
 
-                        console.log("params : ", params);
+                        console.log(`[API Generate] Executing Procedure: ${table.procedureName} with params:`, params);
 
                         const data: any = await prisma.$queryRawUnsafe(`SELECT * FROM ${table.procedureName}(${params?.map((p: any, index: number) => `$${index + 1}`).join(',')});`, ...params);
 
@@ -62,14 +62,13 @@ export async function POST(request: NextRequest) {
                         } else {
                             fullData[table.tableName] = data[0];
                         }
-                        
 
-                        console.log("fullData : ", fullData)
+                        console.log(`[API Generate] Data for ${table.tableName} fetched:`, fullData[table.tableName] ? "SUCCESS" : "EMPTY");
                     } catch (procError) {
                         console.error(`Error executing procedure ${table.procedureName}:`, procError);
                     }
                 }
-            })
+            }
         }
 
         // return NextResponse.json({ msg: "DONE PROCESS" }, { status: 200 });

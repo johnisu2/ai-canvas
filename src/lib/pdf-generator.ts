@@ -97,6 +97,10 @@ export async function generatePdf(
     ): any => {
         if (!formula || typeof formula !== "string") return currentValue ?? "";
 
+        // DEBUG LOG
+        console.log(`[PDF Gen] Running Formula: "${formula}"`);
+        // console.log(`[PDF Gen] Formula Data Context Keys:`, Object.keys(data));
+
         try {
             const expr = formula.trim();
 
@@ -112,14 +116,17 @@ export async function generatePdf(
                 }
                 return result;
             } catch (err) {
+                console.error("[PDF Gen] Formula Runtime Error:", err.message);
                 return "";
             }
         `
             );
 
-            return fn(data, currentValue);
-        } catch (err) {
-            console.error("[PDF Gen] Formula compile error:", formula, err);
+            const finalResult = fn(data, currentValue);
+            console.log(`[PDF Gen] Formula Result: "${finalResult}"`);
+            return finalResult;
+        } catch (err: any) {
+            console.error("[PDF Gen] Formula Compile Error:", formula, err.message);
             return "";
         }
     };
