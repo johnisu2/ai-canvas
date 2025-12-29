@@ -65,7 +65,7 @@ model DbConfigField {
 model DbConfigParam {
   id        Int           @id @default(autoincrement())
   tableId   Int
-  paramName String        // Parameter name matching JSON input
+  paramName String @unique // Parameter name matching JSON input 
   seq       Int           // Sequence order for SP arguments
   table     DbConfigTable @relation(fields: [tableId], references: [id], onDelete: Cascade)
 
