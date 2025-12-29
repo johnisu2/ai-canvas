@@ -135,8 +135,8 @@ export const ElementRenderer = memo(function ElementRenderer({ element, scale, i
                 <div
                     ref={elementRef}
                     className={cn(
-                        "w-full h-full relative flex flex-col transition-all overflow-hidden",
-                        isSelected ? "outline outline-2 outline-indigo-500 shadow-2xl bg-white/50" : cn("border-2", colorMap[element.type] || "border-slate-300")
+                        "w-full h-full relative flex flex-col transition-all overflow-hidden border-2",
+                        isSelected ? "border-indigo-500 shadow-2xl bg-white/50" : cn(colorMap[element.type] || "border-slate-300")
                     )}
                 >
                     <div className="flex-1 w-full h-full relative drag-handle cursor-move">
@@ -157,34 +157,34 @@ export const ElementRenderer = memo(function ElementRenderer({ element, scale, i
                             )}
 
                             {element.type === 'table' && (
-                                <div className="w-full h-full flex flex-col bg-white relative pointer-events-none">
+                                <div className="w-full h-full flex flex-col bg-white/50 relative pointer-events-none bg-opacity-50">
                                     {(() => {
                                         const columns = Array.isArray(element.metadata) ? element.metadata : [];
                                         if (columns.length === 0) return <div className="flex-1 flex items-center justify-center opacity-30"><Grid /> Empty Table</div>;
 
                                         let cur = 0;
-                                        const positions = columns.map(c => cur += (parseFloat(c.width) || (100 / columns.length))).slice(0, -1);
+                                        const positions = columns.map((c: any) => cur += (parseFloat(c.width) || (100 / columns.length))).slice(0, -1);
 
                                         return (
                                             <>
                                                 {/* Grid Lines */}
-                                                {positions.map((pos, i) => (
-                                                    <div key={`g-${i}`} className="absolute inset-y-0 w-px bg-slate-100" style={{ left: `${pos}%`, transform: 'translateX(-0.5px)' }} />
+                                                {positions.map((pos: any, i: number) => (
+                                                    <div key={`g-${i}`} className="absolute inset-y-0 w-px bg-slate-300 opacity-80" style={{ left: `${pos}%`, transform: 'translateX(-0.5px)' }} />
                                                 ))}
 
                                                 {/* Resizers */}
-                                                {isSelected && positions.map((pos, i) => (
+                                                {isSelected && positions.map((pos: any, i: number) => (
                                                     <div
                                                         key={`r-${i}`}
                                                         className="absolute inset-y-0 w-8 -ml-4 cursor-col-resize hover:bg-indigo-500/5 pointer-events-auto z-[80] group/r"
                                                         style={{ left: `${pos}%` }}
-                                                        onMouseDown={(e) => {
+                                                        onMouseDown={(e: React.MouseEvent) => {
                                                             e.stopPropagation();
                                                             const startX = e.clientX;
                                                             const container = e.currentTarget.closest('.drag-handle');
                                                             if (!container) return;
                                                             const rect = container.getBoundingClientRect();
-                                                            const widths = columns.map(c => parseFloat(c.width) || (100 / columns.length));
+                                                            const widths = columns.map((c: any) => parseFloat(c.width) || (100 / columns.length));
 
                                                             const move = (ev: MouseEvent) => {
                                                                 const delta = ((ev.clientX - startX) / rect.width) * 100;
@@ -207,12 +207,23 @@ export const ElementRenderer = memo(function ElementRenderer({ element, scale, i
                                                 ))}
 
                                                 {/* Data Row */}
-                                                <div className="absolute inset-0 flex flex-col divide-y divide-slate-50">
-                                                    {[1, 2, 3, 4, 5].map(row => (
-                                                        <div key={row} className="flex h-full min-h-[1.25rem]">
-                                                            {columns.map((col, j) => (
-                                                                <div key={j} style={{ width: col.width || `${100 / columns.length}%` }} className="flex items-center px-2 truncate leading-none">
-                                                                    {row === 1 ? <span className="text-[9px] font-bold text-indigo-500 uppercase">{col.field || "FIELD"}</span> : <span className="text-[8px] text-slate-300 italic">data...</span>}
+                                                <div className="absolute inset-0 flex flex-col">
+                                                    {[1, 2, 3, 4, 5].map((row: number, idx: number, arr: any[]) => (
+                                                        <div key={row} className="relative flex h-full min-h-[1.25rem]">
+                                                            {/* horizontal line */}
+                                                            {idx !== arr.length - 1 && (
+                                                                <div className="absolute bottom-0 left-0 right-0 h-[1px] bg-slate-400/80 z-[60]" />
+                                                            )}
+
+                                                            {columns.map((col: any, j: number) => (
+                                                                <div
+                                                                    key={j}
+                                                                    style={{ width: col.width || `${100 / columns.length}%` }}
+                                                                    className="flex items-center px-2 truncate leading-none"
+                                                                >
+                                                                    {row === 1
+                                                                        ? <span className="text-[9px] font-bold text-indigo-500 uppercase">{col.field || "FIELD"}</span>
+                                                                        : <span className="text-[8px] text-slate-300 italic">data...</span>}
                                                                 </div>
                                                             ))}
                                                         </div>

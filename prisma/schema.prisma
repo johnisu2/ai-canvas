@@ -43,7 +43,8 @@ model CanvasElement {
 
 model DbConfigTable {
   id            Int             @id @default(autoincrement())
-  tableName     String          // Display Name / Logical Name
+  tableName     String          // Technical name (e.g. table name or SP name) for data mapping
+  displayName   String?         // Display name for UI
   procedureName String          // Stored Procedure or Table Name for query
   fields        DbConfigField[]
   params        DbConfigParam[]

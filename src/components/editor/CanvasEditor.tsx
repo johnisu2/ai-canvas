@@ -293,7 +293,7 @@ export function CanvasEditor({ documentId, fileUrl, fileType = 'pdf', initialEle
                     className="relative shadow-lg bg-white transition-all duration-200 ease-in-out mb-8"
                     style={{
                         width: '800px', // Default width
-                        minHeight: '1100px', // Default height
+                        height: '1100px', // Fixed height to ensure absolute children cover full area
                         transform: `scale(${scale})`, // Use scale here
                         transformOrigin: 'top center'
                     }}
@@ -320,7 +320,7 @@ export function CanvasEditor({ documentId, fileUrl, fileType = 'pdf', initialEle
                     <img
                         src={fileUrl}
                         alt="Document"
-                        className="absolute inset-0 w-full h-full object-contain pointer-events-none"
+                        className="absolute inset-0 object-contain pointer-events-none"
                     />
 
                     {/* Grid Layer */}
@@ -331,12 +331,12 @@ export function CanvasEditor({ documentId, fileUrl, fileType = 'pdf', initialEle
                     )}
 
                     {/* Elements Layer */}
-                    <div className="absolute inset-0">
+                    <div className="absolute inset-0 w-full h-full ">
                         {elements.map((el) => (
                             <ElementRenderer
                                 key={el.id}
                                 element={el}
-                                scale={1} // Scale handled by parent transform
+                                scale={scale} // Pass actual scale to Rnd so it calculates drag deltas correctly
                                 isSelected={selectedElementId === el.id}
                                 onUpdate={handleUpdateElement}
                                 onSelect={setSelectedElementId}
@@ -349,19 +349,22 @@ export function CanvasEditor({ documentId, fileUrl, fileType = 'pdf', initialEle
                         ))}
                     </div>
                 </div>
-            ) : null}
+            ) : null
+            }
 
-            {editingElementId && (
-                <EditModal
-                    isOpen={!!editingElementId}
-                    element={elements.find(el => el.id === editingElementId)!}
-                    onClose={() => setEditingElementId(null)}
-                    onSave={handleUpdateElement}
-                    onChange={handleUpdateElement}
-                    onDelete={handleDeleteElement}
-                />
-            )}
+            {
+                editingElementId && (
+                    <EditModal
+                        isOpen={!!editingElementId}
+                        element={elements.find(el => el.id === editingElementId)!}
+                        onClose={() => setEditingElementId(null)}
+                        onSave={handleUpdateElement}
+                        onChange={handleUpdateElement}
+                        onDelete={handleDeleteElement}
+                    />
+                )
+            }
 
-        </div>
+        </div >
     );
 }

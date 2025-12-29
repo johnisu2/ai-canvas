@@ -134,7 +134,12 @@ export function PDFPage({
             )}
 
             {/* Elements Rendering Layer */}
-            <div className="absolute inset-0">
+            <div className="absolute inset-0 w-full h-full"
+                style={{
+                    width: dimensions.width || '800px',
+                    height: dimensions.height || '1100px',
+                    minHeight: '800px'
+                }}>
                 {elements.map((el) => (
                     <ElementRenderer
                         key={el.id}

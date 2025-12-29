@@ -15,23 +15,87 @@ export async function generatePdf(
     dataContext: any,
     fileType: string = 'pdf'
 ) {
-    // 1. Load PDF or Create New from Image
+    // Helper to evaluate scripts safely
+    const evaluateScript = (script: string, data: any) => {
+        if (!script) return "";
+        try {
+            const trimmed = script.trim();
+            const body = (trimmed.startsWith("return") || trimmed.includes(";"))
+                ? trimmed
+                : `return (${trimmed});`;
+
+            const fn = new Function('data', `try { ${body} } catch (e) { return "Error: " + e.message; }`);
+            const result = fn(data);
+            return result === undefined || result === null ? "" : String(result);
+        } catch (e: any) {
+            console.error(`[PDF Gen] Script evaluation failed: ${script}`, e);
+            return "Script Error";
+        }
+    };
+
+    // Helper to fetch image bytes
+    const fetchImageBytes = async (urlOrBase64: string): Promise<Uint8Array | null> => {
+        try {
+            if (!urlOrBase64) return null;
+            const sanitizedUrl = urlOrBase64.trim();
+            if (sanitizedUrl.startsWith("data:image")) {
+                const parts = sanitizedUrl.split(",");
+                if (parts.length < 2) return null;
+                return Uint8Array.from(Buffer.from(parts[1], "base64"));
+            }
+            if (sanitizedUrl.startsWith("http")) {
+                const res = await fetch(sanitizedUrl);
+                if (!res.ok) return null;
+                return new Uint8Array(await res.arrayBuffer());
+            }
+            if (sanitizedUrl.startsWith("/")) {
+                const clean = sanitizedUrl.replace(/\/+/g, "/").replace(/^\/+/, "");
+                return await readFile(join(process.cwd(), "public", clean));
+            }
+            return null;
+        } catch (e) {
+            console.error("Fetch image error", e);
+            return null;
+        }
+    };
+
+    // 1. Create a NEW PDF with Standard Dimensions (Editor 800x1100)
+    // This ensures consistency regardless of input (PDF or Image)
+    const pdfDoc = await PDFDocument.create();
+    const canvasWidth = 800;
+    const canvasHeight = 1100;
+
+    // Load Source File
     const filePath = join(process.cwd(), "public", fileUrl);
     const fileBuffer = await readFile(filePath);
-    let pdfDoc: PDFDocument;
-
     const isPdf = fileType === 'pdf' || fileType.toLowerCase().includes('pdf');
 
     if (isPdf) {
-        pdfDoc = await PDFDocument.load(fileBuffer);
+        // Embed PDF and use its original sizes
+        try {
+            const srcPdf = await PDFDocument.load(fileBuffer);
+            const copiedEmbeds = await pdfDoc.embedPdf(srcPdf);
+
+            copiedEmbeds.forEach((embeddedPage) => {
+                // Use the original dimensions of the embedded page
+                const { width, height } = embeddedPage;
+                const page = pdfDoc.addPage([width, height]);
+
+                page.drawPage(embeddedPage, {
+                    x: 0,
+                    y: 0,
+                    width: width,
+                    height: height
+                });
+            });
+            console.log(`[PDF Gen] Embedded ${copiedEmbeds.length} PDF pages with original dimensions`);
+        } catch (e) {
+            console.error("Failed to load/embed source PDF", e);
+            pdfDoc.addPage([canvasWidth, canvasHeight]); // Fallback blank page
+        }
     } else {
-        // Assume Image (jpg, png)
-        pdfDoc = await PDFDocument.create();
-
-        // Editor Canvas Dimensions (Fixed 800x1100 in CanvasEditor.tsx)
-        const canvasWidth = 800;
-        const canvasHeight = 1100;
-
+        // Embed Image and Scale
+        // Same logic as before but now strictly forcing 800x1100
         try {
             let image;
             try {
@@ -40,44 +104,39 @@ export async function generatePdf(
                 image = await pdfDoc.embedJpg(fileBuffer);
             }
 
+            const page = pdfDoc.addPage([canvasWidth, canvasHeight]);
+
+            // Calculate Object Contain positioning (matching Editor's object-contain)
             const imgWidth = image.width;
             const imgHeight = image.height;
-
-            // Calculate scale to mimic CSS 'object-contain'
-            const imgRatio = imgWidth / imgHeight;
+            const ratio = imgWidth / imgHeight;
             const canvasRatio = canvasWidth / canvasHeight;
 
-            let finalWidth, finalHeight, offsetX, offsetY;
+            let drawWidth = canvasWidth;
+            let drawHeight = canvasHeight;
+            let drawX = 0;
+            let drawY = 0;
 
-            if (imgRatio > canvasRatio) {
-                // Wider than canvas -> constrain by width
-                finalWidth = canvasWidth;
-                finalHeight = canvasWidth / imgRatio;
-                offsetX = 0;
-                // object-contain centers vertically
-                offsetY = (canvasHeight - finalHeight) / 2;
+            if (ratio > canvasRatio) {
+                // Width constrained - centered vertically
+                drawHeight = canvasWidth / ratio;
+                drawY = (canvasHeight - drawHeight) / 2;
             } else {
-                // Taller than canvas -> constrain by height
-                finalHeight = canvasHeight;
-                finalWidth = canvasHeight * imgRatio;
-                // object-contain centers horizontally
-                offsetX = (canvasWidth - finalWidth) / 2;
-                offsetY = 0;
+                // Height constrained - centered horizontally
+                drawWidth = canvasHeight * ratio;
+                drawX = (canvasWidth - drawWidth) / 2;
             }
 
-            // PDF drawing 'y' is from bottom-left.
-            const pdfY = canvasHeight - offsetY - finalHeight;
-
-            const page = pdfDoc.addPage([canvasWidth, canvasHeight]);
             page.drawImage(image, {
-                x: offsetX,
-                y: pdfY,
-                width: finalWidth,
-                height: finalHeight,
+                x: drawX,
+                y: drawY,
+                width: drawWidth,
+                height: drawHeight
             });
+            console.log(`[PDF Gen] Embedded Image with object-contain at ${drawX},${drawY} dims ${drawWidth}x${drawHeight}`);
 
         } catch (e) {
-            console.error("Failed to embed background image:", e);
+            console.error("Failed to embed background image", e);
             pdfDoc.addPage([canvasWidth, canvasHeight]);
         }
     }
@@ -85,22 +144,21 @@ export async function generatePdf(
     // Register fontkit to support custom fonts
     pdfDoc.registerFontkit(fontkit);
 
-    // Embed Fonts
-    // Sarabun
+    // Embed Fonts (Sarabun & Symbols)
     if (!cachedSarabunBytes) {
-        const sarabunPath = join(process.cwd(), "public", "fonts", "Sarabun-Regular.ttf");
-        cachedSarabunBytes = await readFile(sarabunPath);
+        cachedSarabunBytes = await readFile(join(process.cwd(), "public", "fonts", "Sarabun-Regular.ttf"));
     }
     const sarabunFont = await pdfDoc.embedFont(cachedSarabunBytes, { subset: true });
 
-    // Noto Sans Symbols 2
     if (!cachedSymbolsBytes) {
-        const symbolsPath = join(process.cwd(), "public", "fonts", "NotoSansSymbols2-Regular.ttf");
-        cachedSymbolsBytes = await readFile(symbolsPath);
+        cachedSymbolsBytes = await readFile(join(process.cwd(), "public", "fonts", "NotoSansSymbols2-Regular.ttf"));
     }
     const symbolsFont = await pdfDoc.embedFont(cachedSymbolsBytes, { subset: true });
 
-    // Helper to draw text with font switching (Thai/EN/Symbols)
+    // Determine number of pages
+    const totalPages = pdfDoc.getPageCount();
+
+    // Helper to draw text with font switching
     const drawRichText = (page: any, text: string, x: number, y: number, fontSize: number, rotation: number = 0) => {
         let currentX = x;
         const rad = (rotation * Math.PI) / 180;
@@ -137,89 +195,6 @@ export async function generatePdf(
                 rotate: radians(rotation)
             });
             currentX += segment.font.widthOfTextAtSize(segment.text, fontSize);
-        }
-    };
-
-    // Helper to fetch image bytes from URL or Base64
-    const fetchImageBytes = async (urlOrBase64: string): Promise<Uint8Array | null> => {
-        try {
-            if (!urlOrBase64) return null;
-            const sanitizedUrl = urlOrBase64.trim();
-            console.log(`[PDF Gen] Fetching image from: ${sanitizedUrl.substring(0, 50)}...`);
-
-            if (sanitizedUrl.startsWith("data:image")) {
-                const parts = sanitizedUrl.split(",");
-                if (parts.length < 2) throw new Error("Invalid Base64 data");
-                const base64Data = parts[1];
-                const bytes = Uint8Array.from(Buffer.from(base64Data, "base64"));
-                console.log(`[PDF Gen] Decoded Base64, size: ${bytes.length} bytes`);
-                return bytes;
-            }
-            if (sanitizedUrl.startsWith("http")) {
-                // Use a controller to timeout if needed, but for now just standard fetch
-                const response = await fetch(sanitizedUrl, {
-                    headers: {
-                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-                    }
-                });
-                if (!response.ok) {
-                    console.warn(`[PDF Gen] HTTP Error ${response.status} for ${sanitizedUrl}`);
-                    return null;
-                }
-                const arrayBuffer = await response.arrayBuffer();
-                const bytes = new Uint8Array(arrayBuffer);
-                console.log(`[PDF Gen] Fetched from URL, size: ${bytes.length} bytes`);
-                return bytes;
-            }
-            if (sanitizedUrl.startsWith("/")) {
-                // Remove leading slash for join to work correctly with public
-                // Also remove any double slashes or spaces that might have sneaked in
-                const cleanPath = sanitizedUrl.replace(/\/+/g, "/").replace(/^\/+/, "");
-                const localPath = join(process.cwd(), "public", cleanPath);
-
-                try {
-                    const buffer = await readFile(localPath);
-                    console.log(`[PDF Gen] Loaded local file: ${localPath}, size: ${buffer.length} bytes`);
-                    return new Uint8Array(buffer);
-                } catch (fsError: any) {
-                    if (fsError.code === 'ENOENT') {
-                        console.warn(`[PDF Gen] Local file not found: ${localPath}`);
-                        return null;
-                    }
-                    throw fsError;
-                }
-            }
-            console.warn(`[PDF Gen] Unknown image source type: ${sanitizedUrl.substring(0, 20)}`);
-            return null;
-        } catch (error) {
-            console.error(`[PDF Gen] Image fetch failed:`, error);
-            return null;
-        }
-    };
-
-    // Helper to evaluate scripts safely
-    const evaluateScript = (script: string, data: any) => {
-        if (!script) return "";
-        try {
-            const trimmed = script.trim();
-            // If it already has a return statement, use it as is. 
-            // Otherwise, wrap it to make it an expression.
-            const body = (trimmed.startsWith("return") || trimmed.includes(";"))
-                ? trimmed
-                : `return (${trimmed});`;
-
-            const fn = new Function('data', `
-                try { 
-                    ${body} 
-                } catch (e) { 
-                    return "Error: " + e.message; 
-                }
-            `);
-            const result = fn(data);
-            return result === undefined || result === null ? "" : String(result);
-        } catch (e: any) {
-            console.error(`[PDF Gen] Script evaluation failed: ${script}`, e);
-            return "Script Error";
         }
     };
 
@@ -342,13 +317,28 @@ export async function generatePdf(
                 }
             } else if (element.type === "table") {
                 const columns = Array.isArray(element.metadata) ? element.metadata : [];
+                console.log(`[PDF Gen] Table Metadata:`, columns);
                 if (columns.length > 0) {
-                    const tableKey = element.fieldName?.split('.')[0] || "Table";
-                    const tableData = dataContext && Array.isArray(dataContext[tableKey])
-                        ? dataContext[tableKey]
-                        : [];
+                    const tableKey = element.fieldName?.split('.')[0];
+                    let tableData: any[] = [];
+                    console.log(`[PDF Gen] tableKey:`, columns);
 
-                    console.log(`[PDF Gen] Table Debug: key="${tableKey}", dataLength=${tableData.length}`);
+                    console.log(`[PDF Gen] Table Processing: Element ID=${element.id}, FieldName="${element.fieldName}"`);
+                    console.log(`[PDF Gen] Available Keys in DataContext:`, Object.keys(dataContext || {}));
+
+                    // Fallback to "Table" only if tableKey is null/undefined/empty string
+                    // const keyToUse = "Table";
+                    const keyToUse = tableKey || "Table";
+                    console.log(`[PDF Gen] Looking for data with key: "${keyToUse}"`);
+
+                    if (dataContext && Array.isArray(dataContext[keyToUse])) {
+                        tableData = dataContext[keyToUse];
+                        console.log(`[PDF Gen] Found data for "${keyToUse}". Rows: ${tableData.length}`);
+                    } else {
+                        console.warn(`[PDF Gen] Data NOT found or not an array for key: "${keyToUse}". Value:`, dataContext ? dataContext[keyToUse] : "No Context");
+                    }
+
+                    console.log(`[PDF Gen] Table Debug: key="Table", dataLength=${tableData.length}`);
 
                     const rowHeight = 22;
                     const fontSize = element.fontSize || 10;
@@ -363,14 +353,14 @@ export async function generatePdf(
                         const rowY = currentY - (i * rowHeight);
 
                         // Row Border
-                        page.drawRectangle({
-                            x: x,
-                            y: rowY - rowHeight,
-                            width: element.width,
-                            height: rowHeight,
-                            borderWidth: 0.5,
-                            borderColor: rgb(0.7, 0.7, 0.7),
-                        });
+                        // page.drawRectangle({
+                        //     x: x,
+                        //     y: rowY - rowHeight,
+                        //     width: element.width,
+                        //     height: rowHeight,
+                        //     borderWidth: 0.5,
+                        //     borderColor: rgb(0.7, 0.7, 0.7),
+                        // });
 
                         for (const col of columns) {
                             const colWidthPercent = parseFloat(col.width) || (100 / columns.length);
@@ -387,7 +377,7 @@ export async function generatePdf(
                                 page,
                                 cellValue,
                                 currentX + 5,
-                                rowY - (rowHeight * 0.75),
+                                rowY - (rowHeight / 2) - (fontSize / 3),
                                 fontSize
                             );
 

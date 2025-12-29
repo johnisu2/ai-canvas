@@ -15,6 +15,7 @@ interface DBField {
 interface DBTable {
     id: number;
     tableName: string;
+    displayName: string | null;
     fields: DBField[];
 }
 
@@ -232,16 +233,30 @@ export function EditModal({ element, isOpen, onClose, onSave, onChange, onDelete
                     </label>
                     <div className={cn("grid gap-2", element.type === 'table' ? "grid-cols-1" : "grid-cols-2")}>
                         {/* Table Selector */}
-                        <select
-                            value={selectedTableId}
-                            onChange={handleTableChange}
-                            className="px-3 py-2 border rounded-lg text-sm bg-white outline-none focus:ring-2 focus:ring-indigo-500 font-medium"
-                        >
-                            <option value="">-- {element.type === 'table' ? 'เลือกตารางหลัก' : 'เลือกตาราง'} --</option>
-                            {tables.map(table => (
-                                <option key={table.id} value={table.id}>{table.tableName}</option>
-                            ))}
-                        </select>
+                        <div className="flex flex-col gap-1">
+                            <select
+                                value={selectedTableId}
+                                onChange={handleTableChange}
+                                className="px-3 py-2 border rounded-lg text-sm bg-white outline-none focus:ring-2 focus:ring-indigo-500 font-medium w-full"
+                            >
+                                <option value="">-- {element.type === 'table' ? 'เลือกตารางหลัก / กำหนดเอง' : 'เลือกตาราง'} --</option>
+                                {tables.map(table => (
+                                    <option key={table.id} value={table.id}>
+                                        {table.tableName || table.displayName}
+                                    </option>
+                                ))}
+                            </select>
+                            {/* Manual Override for Table Name (only if no DB table selected or to show current) */}
+                            {/* {element.type === 'table' && !selectedTableId && (
+                                <input
+                                    type="text"
+                                    placeholder="ระบุ Key ใน JSON (เช่น Table, prescription_items)"
+                                    value={formData.fieldName || ""}
+                                    onChange={(e) => handleChange("fieldName", e.target.value)}
+                                    className="px-3 py-2 border rounded-lg text-sm bg-slate-50 outline-none focus:ring-2 focus:ring-indigo-500 font-mono text-indigo-700"
+                                />
+                            )} */}
+                        </div>
 
                         {/* Field Selector (Hidden for Tables) */}
                         {element.type !== 'table' && (
@@ -258,12 +273,6 @@ export function EditModal({ element, isOpen, onClose, onSave, onChange, onDelete
                             </select>
                         )}
                     </div>
-                    {/* Read-only view of current mapping */}
-                    {formData.fieldName && (
-                        <div className="mt-2 text-xs text-slate-500 font-mono bg-slate-50/50 p-1.5 rounded border border-slate-100 text-right">
-                            สถานะการเชื่อมต่อ: <span className="text-indigo-600 font-bold">{formData.fieldName}</span>
-                        </div>
-                    )}
                 </div>
 
                 {/* Type Specifics */}
@@ -406,28 +415,43 @@ export function EditModal({ element, isOpen, onClose, onSave, onChange, onDelete
                                     <div className="col-span-1 border-r border-slate-200 text-center font-mono text-[10px] text-slate-400">
                                         {idx + 1}
                                     </div>
-                                    <div className="col-span-5">
-                                        <select
-                                            value={col.fieldId || col.field}
+                                    <div className="col-span-5 flex flex-col gap-1">
+                                        {activeFields.length > 0 && (
+                                            <select
+                                                value={col.fieldId || ""}
+                                                onChange={e => {
+                                                    const fieldId = parseInt(e.target.value);
+                                                    const fieldObj = activeFields.find(f => f.id === fieldId);
+                                                    const newCols = [...(formData.metadata as any)];
+                                                    newCols[idx] = {
+                                                        ...col,
+                                                        field: fieldObj?.fieldName || "",
+                                                        fieldId: isNaN(fieldId) ? undefined : fieldId
+                                                    };
+                                                    handleChange("metadata", newCols);
+                                                }}
+                                                className="w-full text-xs px-2 py-1.5 border border-slate-300 rounded bg-white outline-none focus:ring-1 focus:ring-indigo-500"
+                                            >
+                                                <option value="">-- เลือกจาก DB --</option>
+                                                {activeFields.map(f => (
+                                                    <option key={f.id} value={f.id}>{f.label || f.fieldName}</option>
+                                                ))}
+                                            </select>
+                                        )}
+                                        {/* <input
+                                            placeholder="Key (เช่น item, qty)"
+                                            value={col.field || ""}
                                             onChange={e => {
-                                                const fieldId = parseInt(e.target.value);
-                                                const fieldObj = activeFields.find(f => f.id === fieldId);
                                                 const newCols = [...(formData.metadata as any)];
                                                 newCols[idx] = {
                                                     ...col,
-                                                    field: fieldObj?.fieldName || e.target.value,
-                                                    fieldId: isNaN(fieldId) ? undefined : fieldId
+                                                    field: e.target.value,
+                                                    fieldId: undefined // Clear ID if typing manually
                                                 };
                                                 handleChange("metadata", newCols);
                                             }}
-                                            disabled={!selectedTableId}
-                                            className="w-full text-xs px-2 py-1.5 border border-slate-300 rounded bg-white outline-none focus:ring-1 focus:ring-indigo-500"
-                                        >
-                                            <option value="">-- เลือกฟิลด์ --</option>
-                                            {activeFields.map(f => (
-                                                <option key={f.id} value={f.id}>{f.label || f.fieldName}</option>
-                                            ))}
-                                        </select>
+                                            className="w-full text-xs px-2 py-1.5 border border-slate-300 rounded bg-white outline-none focus:ring-1 focus:ring-indigo-500 font-mono"
+                                        /> */}
                                     </div>
                                     <div className="col-span-3">
                                         <input
@@ -477,6 +501,32 @@ export function EditModal({ element, isOpen, onClose, onSave, onChange, onDelete
                         )}
                     </div>
                 )}
+                {element.type === "table" && (
+                    <div className="grid grid-cols-2 gap-4">
+                        <div>
+                            <label className="block text-sm font-medium text-slate-700 mb-1">ขนาดตัวอักษร</label>
+                            <input
+                                type="number"
+                                value={formData.fontSize || 14}
+                                onChange={e => handleChange("fontSize", parseInt(e.target.value))}
+                                className="w-full px-3 py-2 border rounded-lg"
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-slate-700 mb-1">การจัดวาง</label>
+                            <select
+                                value={formData.alignment || "left"}
+                                onChange={e => handleChange("alignment", e.target.value)}
+                                className="w-full px-3 py-2 border rounded-lg bg-white"
+                            >
+                                <option value="left">ชิดซ้าย</option>
+                                <option value="center">กึ่งกลาง</option>
+                                <option value="right">ชิดขวา</option>
+                            </select>
+                        </div>
+                    </div>
+                )}
+
             </div>
         );
     };

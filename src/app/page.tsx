@@ -25,9 +25,19 @@ export default function Home() {
   const [jsonInput, setJsonInput] = useState(JSON.stringify({
     "first_name": "สมชาย",
     "image": "/uploads/mock_patient.png",
-    "Table": [
-      { "item": "ยาพาราเซลตามอล", "qty": 2, "price": 100 },
-      { "item": "ยาแก้ไอ", "qty": 1, "price": 50 }
+    "prescription_items": [
+      {
+        "rx_no": "RX-2024-001",
+        "drug_code": "D001",
+        "qty": 20,
+        "amount": 30
+      },
+      {
+        "rx_no": "RX-2024-002",
+        "drug_code": "D002",
+        "qty": 10,
+        "amount": 50
+      }
     ]
   }, null, 2));
   const [isGenerating, setIsGenerating] = useState(false);
@@ -272,14 +282,14 @@ export default function Home() {
               เอกสารล่าสุด (Recent Documents)
             </h2>
             <div className="flex items-center gap-3">
-              <div className="relative">
+              {/* <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                 <input
                   type="text"
                   placeholder="ค้นหา..."
                   className="pl-9 pr-4 py-2 rounded-xl border border-slate-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all w-64"
                 />
-              </div>
+              </div> */}
             </div>
           </div>
 
