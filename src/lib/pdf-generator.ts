@@ -31,7 +31,7 @@ export async function generatePdf(
             blood_group: 'O',
             id_card: '1-1001-01234-56-7',
             allergies: 'Penicillin',
-            image: '/uploads/mock_patient.png'
+            image: '/uploads/mock_patient.jpg'
         },
         patient: [{
             hn: 'HN001',
@@ -44,7 +44,7 @@ export async function generatePdf(
             blood_group: 'O',
             id_card: '1-1001-01234-56-7',
             allergies: 'Penicillin',
-            image: '/uploads/mock_patient.png'
+            image: '/uploads/mock_patient.jpg'
         }, {
             hn: 'HN001',
             first_name: 'สมชาย',
@@ -56,7 +56,7 @@ export async function generatePdf(
             blood_group: 'O',
             id_card: '1-1001-01234-56-7',
             allergies: 'Penicillin',
-            image: '/uploads/mock_patient.png'
+            image: '/uploads/mock_patient.jpg'
         }],
         drugs: {
             code: 'D001',
@@ -70,8 +70,8 @@ export async function generatePdf(
         }
     };
     // FORCE USE MOCK DATA
-    dataContext = _dataContext;
-    const data: any = _dataContext;
+    // dataContext = _dataContext;
+    const data: any = dataContext;
     // Helper to evaluate scripts safely
     const evaluateScript = (script: string, data: any, currentValue?: any) => {
         if (!script) return currentValue || "";
@@ -574,19 +574,19 @@ export async function generatePdf(
                             drawRichText(page, truncatedVal, pos.x, pos.y, fontSize, pdfRotDeg);
 
                             // DEBUG: Draw Border
-                            try {
-                                page.drawRectangle({
-                                    x: pos.x,
-                                    y: pos.y - 2,
-                                    width: colWidth,
-                                    height: rowHeight,
-                                    borderColor: rgb(1, 0, 0),
-                                    borderWidth: 1,
-                                });
-                                console.log(`[PDF Gen]    Border Drawn`);
-                            } catch (e) {
-                                console.error(`[PDF Gen]    Border Draw Failed`, e);
-                            }
+                            // try {
+                            //     page.drawRectangle({
+                            //         x: pos.x,
+                            //         y: pos.y - 2,
+                            //         width: colWidth,
+                            //         height: rowHeight,
+                            //         borderColor: rgb(1, 0, 0),
+                            //         borderWidth: 1,
+                            //     });
+                            //     console.log(`[PDF Gen]    Border Drawn`);
+                            // } catch (e) {
+                            //     console.error(`[PDF Gen]    Border Draw Failed`, e);
+                            // }
 
                             currentColX += colWidth;
                         }
