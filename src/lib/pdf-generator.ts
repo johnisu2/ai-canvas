@@ -70,30 +70,22 @@ export async function generatePdf(
     // Load Source File
     const filePath = join(process.cwd(), "public", fileUrl);
     const fileBuffer = await readFile(filePath);
-    const isPdf = fileType === 'pdf' || fileType.toLowerCase().includes('pdf');
+    const isPdf = fileType?.toLowerCase().includes('pdf') || fileUrl.toLowerCase().endsWith('.pdf');
 
     if (isPdf) {
-        // Embed PDF and use its original sizes
         try {
             const srcPdf = await PDFDocument.load(fileBuffer);
-            const copiedEmbeds = await pdfDoc.embedPdf(srcPdf);
+            const indices = srcPdf.getPageIndices();
+            const copiedPages = await pdfDoc.copyPages(srcPdf, indices);
+            copiedPages.forEach((page) => pdfDoc.addPage(page));
+            console.log(`[PDF Gen] Copied ${copiedPages.length} PDF pages`);
 
-            copiedEmbeds.forEach((embeddedPage) => {
-                // Use the original dimensions of the embedded page
-                const { width, height } = embeddedPage;
-                const page = pdfDoc.addPage([width, height]);
-
-                page.drawPage(embeddedPage, {
-                    x: 0,
-                    y: 0,
-                    width: width,
-                    height: height
-                });
-            });
-            console.log(`[PDF Gen] Embedded ${copiedEmbeds.length} PDF pages with original dimensions`);
+            if (copiedPages.length === 0) {
+                pdfDoc.addPage([canvasWidth, canvasHeight]);
+            }
         } catch (e) {
-            console.error("Failed to load/embed source PDF", e);
-            pdfDoc.addPage([canvasWidth, canvasHeight]); // Fallback blank page
+            console.error("Failed to load/copy source PDF", e);
+            pdfDoc.addPage([canvasWidth, canvasHeight]);
         }
     } else {
         // Embed Image and Scale
@@ -208,10 +200,18 @@ export async function generatePdf(
     // 2. Process Elements
     for (const element of elements) {
         try {
-            const pages = pdfDoc.getPages();
+            let pages = pdfDoc.getPages();
             const pageIndex = (element.pageNumber || 1) - 1;
 
-            if (pageIndex < 0 || pageIndex >= pages.length) continue;
+            if (pageIndex < 0) continue;
+
+            // Ensure the page exists (if element is on page 2 but base is 1 page)
+            while (pageIndex >= pages.length) {
+                console.log(`[PDF Gen] Adding extra page for element on page ${pageIndex + 1}`);
+                pdfDoc.addPage([canvasWidth, canvasHeight]);
+                pages = pdfDoc.getPages();
+            }
+
             const page = pages[pageIndex];
             const { height: pageHeight } = page.getSize();
 
