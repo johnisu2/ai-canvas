@@ -233,7 +233,7 @@ export function EditModal({ element, isOpen, onClose, onSave, onChange, onDelete
                     </label>
                     <div className={cn("grid gap-2", element.type === 'table' ? "grid-cols-1" : "grid-cols-2")}>
                         {/* Table Selector */}
-                        <div className="flex flex-col gap-1">
+                        <div className="flex flex-col gap-1.5">
                             <select
                                 value={selectedTableId}
                                 onChange={handleTableChange}
@@ -246,11 +246,18 @@ export function EditModal({ element, isOpen, onClose, onSave, onChange, onDelete
                                     </option>
                                 ))}
                             </select>
+
+                            {selectedTableId && (
+                                <div className="flex items-center gap-1.5 px-2 py-1 bg-indigo-50 border border-indigo-100/50 rounded text-[10px] text-slate-500 font-mono">
+                                    <Database className="w-3 h-3 text-indigo-400" />
+                                    <span>Base: <span className="text-indigo-600 font-semibold">{tables.find(t => t.id === selectedTableId)?.tableName}</span></span>
+                                </div>
+                            )}
                         </div>
 
                         {/* Field Selector (Hidden for Tables) */}
                         {element.type !== 'table' && (
-                            <div className="flex flex-col gap-1">
+                            <div className="flex flex-col gap-1.5">
                                 <select
                                     value={selectedFieldId}
                                     onChange={handleFieldChange}
@@ -264,9 +271,9 @@ export function EditModal({ element, isOpen, onClose, onSave, onChange, onDelete
                                 </select>
 
                                 {selectedFieldId && (
-                                    <div className="flex items-center gap-1.5 px-2 py-1 bg-slate-50 border border-slate-100 rounded text-[10px] text-slate-500 font-mono">
-                                        <Code className="w-3 h-3 text-indigo-400" />
-                                        <span>Technical Name: <span className="text-indigo-600">{activeFields.find(f => f.id === selectedFieldId)?.fieldName}</span></span>
+                                    <div className="flex items-center gap-1.5 px-2 py-1 bg-purple-50 border border-purple-100/50 rounded text-[10px] text-slate-500 font-mono">
+                                        <Code className="w-3 h-3 text-purple-400" />
+                                        <span>Key: <span className="text-purple-600 font-semibold">{activeFields.find(f => f.id === selectedFieldId)?.fieldName}</span></span>
                                     </div>
                                 )}
                             </div>
