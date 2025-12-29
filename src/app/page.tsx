@@ -44,27 +44,27 @@ export default function Home() {
     "patients": [
       {
         "hn": "HN001",
-        "firstName": "สมชาย",
-        "lastName": "ใจดี",
+        "first_name": "สมชาย",
+        "last_name": "ใจดี",
         "gender": "ชาย",
         "phone": "081-234-5678",
         "address": "123 ถ.สุขุมวิท กทม.",
         "dob": "1985-05-20",
-        "bloodGroup": "O",
-        "idCard": "1-1001-01234-56-7",
+        "blood_group": "O",
+        "id_card": "1-1001-01234-56-7",
         "allergies": "Penicillin",
         "image": "/uploads/mock_patient.png"
       },
       {
         "hn": "HN002",
-        "firstName": "สมหญิง",
-        "lastName": "รักเรียน",
+        "first_name": "สมหญิง",
+        "last_name": "รักเรียน",
         "gender": "หญิง",
         "phone": "089-876-5432",
         "address": "456/7 ซ.อารีย์ ถ.พหลโยธิน กทม.",
         "dob": "1992-11-12",
-        "bloodGroup": "AB",
-        "idCard": "3-2101-00456-78-9",
+        "blood_group": "AB",
+        "id_card": "3-2101-00456-78-9",
         "allergies": "ไม่มี",
         "image": "/uploads/mock_patient_2.png"
       }
@@ -180,10 +180,10 @@ export default function Home() {
             </span>
           </div>
           <div className="flex items-center gap-4">
-            <button className="px-4 py-2 text-sm font-medium text-slate-500 hover:text-slate-800 transition-colors">
+            {/* <button className="px-4 py-2 text-sm font-medium text-slate-500 hover:text-slate-800 transition-colors">
               คู่มือการใช้งาน
             </button>
-            <div className="w-8 h-8 rounded-full bg-slate-200 border border-slate-300" />
+            <div className="w-8 h-8 rounded-full bg-slate-200 border border-slate-300" /> */}
           </div>
         </div>
       </nav>
