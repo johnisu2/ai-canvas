@@ -166,7 +166,11 @@ export function CanvasEditor({ documentId, fileUrl, fileType = 'pdf', initialEle
                     icon: 'success',
                     title: 'บันทึกสำเร็จ',
                     showConfirmButton: false,
-                    timer: 1500
+                    timer: 1500,
+                    timerProgressBar: true,
+                    willClose: () => {
+                        window.location.reload();
+                    }
                 });
             } else {
                 Swal.fire({
@@ -175,6 +179,7 @@ export function CanvasEditor({ documentId, fileUrl, fileType = 'pdf', initialEle
                     text: 'ไม่สามารถบันทึกข้อมูลได้ กรุณาลองใหม่อีกครั้ง',
                 });
             }
+
         } catch (err) {
             console.error("Save failed:", err);
             Swal.fire({

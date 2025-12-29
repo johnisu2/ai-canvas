@@ -242,7 +242,7 @@ export function EditModal({ element, isOpen, onClose, onSave, onChange, onDelete
                                 <option value="">-- {element.type === 'table' ? 'เลือกตารางหลัก / กำหนดเอง' : 'เลือกตาราง'} --</option>
                                 {tables.map(table => (
                                     <option key={table.id} value={table.id}>
-                                        {table.tableName || table.displayName}
+                                        {table.displayName || table.tableName}
                                     </option>
                                 ))}
                             </select>
@@ -327,10 +327,10 @@ export function EditModal({ element, isOpen, onClose, onSave, onChange, onDelete
 
                 {(element.type === "qr" || element.type === "image") && (
                     <div className="space-y-4 border-t pt-4">
-                        <label className="block text-sm font-medium text-slate-700">ตั้งค่าแหล่งที่มา</label>
+                        {/* <label className="block text-sm font-medium text-slate-700">ตั้งค่าแหล่งที่มา</label>
                         <div className="p-3 bg-slate-50 rounded-lg border text-sm text-slate-600 mb-2">
                             <p>เลือกข้อมูลจากฐานข้อมูล หรืออัปโหลดรูปภาพใหม่</p>
-                        </div>
+                        </div> */}
                         {/* Upload */}
                         <div>
                             <label className="block text-sm font-medium text-slate-700 mb-1">อัปโหลดรูปภาพ (คงที่/เริ่มต้น)</label>
