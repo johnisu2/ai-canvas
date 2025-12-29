@@ -38,6 +38,7 @@ export default async function EditorPage({ params }: { params: Promise<{ id: str
         fontSize: el.fontSize,
         alignment: el.alignment as any,
         pageNumber: el.pageNumber,
+        rotation: el.rotation,
         metadata: el.metadata || undefined
     }));
 
