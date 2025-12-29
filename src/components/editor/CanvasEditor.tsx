@@ -47,63 +47,60 @@ export function CanvasEditor({ documentId, fileUrl, fileType = 'pdf', initialEle
     const [isLoading, setIsLoading] = useState(true);
     const [isSaving, setIsSaving] = useState(false);
     const [isCloning, setIsCloning] = useState(false);
+    const [isFullScreen, setIsFullScreen] = useState(false);
+    const [isFitted, setIsFitted] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
     // Hooks must be at the top level
     const clipboard = useRef<CanvasElement | null>(null);
 
-    // Keyboard Shortcuts
-    useEffect(() => {
-        const handleKeyDown = (e: KeyboardEvent) => {
-            // Ignore if typing in an input
-            if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
 
-            // Delete / Backspace
-            if (e.key === 'Delete' || e.key === 'Backspace') {
-                if (selectedElementId) {
-                    handleDeleteElement(selectedElementId);
-                }
-            }
+    const handleZoomIn = useCallback(() => {
+        setScale((prev) => Math.min(prev + 0.1, 3.0));
+        setIsFitted(false);
+    }, []);
 
-            // Copy (Ctrl+C)
-            if ((e.ctrlKey || e.metaKey) && e.key === 'c') {
-                if (selectedElementId) {
-                    const el = elements.find(e => e.id === selectedElementId);
-                    if (el) {
-                        clipboard.current = el;
-                        console.log('Copied:', el);
-                    }
-                }
-            }
+    const handleZoomOut = useCallback(() => {
+        setScale((prev) => Math.max(prev - 0.1, 0.5));
+        setIsFitted(false);
+    }, []);
 
-            // Paste (Ctrl+V)
-            if ((e.ctrlKey || e.metaKey) && e.key === 'v') {
-                if (clipboard.current) {
-                    const newId = uuidv4();
-                    const offset = 20; // Slight offset so it doesn't overlap exactly
-                    const newElement: CanvasElement = {
-                        ...clipboard.current,
-                        id: newId,
-                        x: clipboard.current.x + offset,
-                        y: clipboard.current.y + offset,
-                        // Ensure it stays on the same page or current view? 
-                        // For now keep same page as original
-                    };
-                    setElements((prev) => [...prev, newElement]);
-                    setSelectedElementId(newId);
-                    setEditingElementId(null);
-                    setIsDirty(true);
-                }
-            }
-        };
+    const handleToggleGrid = useCallback(() => setShowGrid((prev) => !prev), []);
 
-        window.addEventListener('keydown', handleKeyDown);
-        return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [selectedElementId, elements]);
+    const handleFitToScreen = useCallback(() => {
+        const container = document.querySelector('.editor-scroll-container');
+        if (!container) {
+            setScale(1.0);
+            setIsFitted(false);
+            return;
+        }
 
-    const handleZoomIn = () => setScale((prev) => Math.min(prev + 0.1, 3.0));
-    const handleZoomOut = () => setScale((prev) => Math.max(prev - 0.1, 0.5));
-    const handleToggleGrid = () => setShowGrid(!showGrid);
+        const containerWidth = container.clientWidth - 100;
+        const canvasWidth = 800;
+        const targetScale = containerWidth / canvasWidth;
+        const finalFitScale = Math.max(0.6, Math.min(targetScale, 1.5));
+
+        if (Math.abs(scale - finalFitScale) < 0.05) {
+            setScale(1.0);
+            setIsFitted(false);
+        } else {
+            setScale(finalFitScale);
+            setIsFitted(true);
+            container.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+    }, [scale]);
+
+    const handleScrollToTop = useCallback(() => {
+        const container = document.querySelector('.editor-scroll-container');
+        if (container) {
+            container.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+    }, []);
+
+    const handleToggleFullScreen = useCallback(() => {
+        setIsFullScreen(prev => !prev);
+    }, []);
+
 
     const handleAddElement = useCallback((pageNumber: number, type: ElementType, x: number, y: number) => {
         const newElement: CanvasElement = {
@@ -127,13 +124,13 @@ export function CanvasEditor({ documentId, fileUrl, fileType = 'pdf', initialEle
 
     const handleDeleteElement = useCallback(async (id: string | number) => {
         const result = await Swal.fire({
-            title: 'ยืนยันการลบ?',
-            text: "คุณต้องการลบองค์ประกอบนี้ใช่หรือไม่?",
+            title: 'ยืนยันการลบข้อมูล',
+            text: "หากลบแล้วจะไม่สามารถกู้คืนข้อมูลนี้ได้",
             icon: 'warning',
             showCancelButton: true,
             confirmButtonColor: '#4f46e5',
             cancelButtonColor: '#ef4444',
-            confirmButtonText: 'ใช่, ลบเลย',
+            confirmButtonText: 'ตกลง',
             cancelButtonText: 'ยกเลิก'
         });
 
@@ -216,6 +213,89 @@ export function CanvasEditor({ documentId, fileUrl, fileType = 'pdf', initialEle
         }
     }, [documentId]);
 
+    // Keyboard Shortcuts
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            // Ignore if typing in an input
+            if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+
+            const key = e.key.toLowerCase();
+
+            // Delete / Backspace
+            if (e.key === 'Delete' || e.key === 'Backspace') {
+                if (selectedElementId) {
+                    handleDeleteElement(selectedElementId);
+                }
+            }
+
+            // Copy (Ctrl+C)
+            if ((e.ctrlKey || e.metaKey) && key === 'c') {
+                if (selectedElementId) {
+                    const el = elements.find(e => e.id === selectedElementId);
+                    if (el) {
+                        clipboard.current = el;
+                        console.log('Copied:', el);
+                    }
+                }
+            }
+
+            // Paste (Ctrl+V)
+            if ((e.ctrlKey || e.metaKey) && key === 'v') {
+                if (clipboard.current) {
+                    const newId = uuidv4();
+                    const offset = 20;
+                    const newElement: CanvasElement = {
+                        ...clipboard.current,
+                        id: newId,
+                        x: clipboard.current.x + offset,
+                        y: clipboard.current.y + offset,
+                    };
+                    setElements((prev) => [...prev, newElement]);
+                    setSelectedElementId(newId);
+                    setEditingElementId(null);
+                    setIsDirty(true);
+                }
+            }
+
+            // Fit to Screen (F)
+            if (key === 'f') {
+                handleFitToScreen();
+            }
+
+            // Toggle Full Screen (M)
+            if (key === 'm') {
+                handleToggleFullScreen();
+            }
+
+            // Toggle Grid (G)
+            if (key === 'g') {
+                handleToggleGrid();
+            }
+
+            // Zoom In (+ or =)
+            if (e.key === '+' || e.key === '=') {
+                handleZoomIn();
+            }
+
+            // Zoom Out (-)
+            if (e.key === '-' || e.key === '_') {
+                handleZoomOut();
+            }
+        };
+
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [
+        selectedElementId,
+        elements,
+        handleFitToScreen,
+        handleToggleFullScreen,
+        handleDeleteElement,
+        handleToggleGrid,
+        handleZoomIn,
+        handleZoomOut
+    ]);
+
     // Click outside to deselect
     const handleBackgroundClick = useCallback((e: React.MouseEvent) => {
         // Only deselect if clicking directly on the background container
@@ -279,10 +359,18 @@ export function CanvasEditor({ documentId, fileUrl, fileType = 'pdf', initialEle
                 showGrid={showGrid}
                 onToggleGrid={handleToggleGrid}
                 onDragStart={() => { }}
+                onFitToScreen={handleFitToScreen}
+                onScrollToTop={handleScrollToTop}
+                onToggleFullScreen={handleToggleFullScreen}
+                isFullScreen={isFullScreen}
+                isFitted={isFitted}
             />
 
             {/* Premium Header Bar */}
-            <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 flex items-center bg-white/80 backdrop-blur-md px-1.5 py-1.5 rounded-2xl shadow-2xl border border-white/20 ring-1 ring-black/5 gap-1">
+            <div className={cn(
+                "fixed top-4 left-1/2 -translate-x-1/2 z-50 flex items-center bg-white/80 backdrop-blur-md px-1.5 py-1.5 rounded-2xl shadow-2xl border border-white/20 ring-1 ring-black/5 gap-1 transition-all duration-500",
+                isFullScreen ? "-translate-y-32 opacity-0 pointer-events-none" : "translate-y-0 opacity-100"
+            )}>
                 {/* Navigation Group */}
                 <div className="flex items-center gap-1">
                     <Link
@@ -356,7 +444,7 @@ export function CanvasEditor({ documentId, fileUrl, fileType = 'pdf', initialEle
             </div>
 
             {/* Main Editor Area */}
-            <div className="flex-1 w-full overflow-auto pt-24" onClick={handleBackgroundClick}>
+            <div className="flex-1 overflow-auto bg-slate-100/50 editor-scroll-container scroll-smooth pt-20" onClick={handleBackgroundClick}>
                 <div
                     className="min-h-full w-full flex flex-col items-center transition-all duration-200"
                     style={{
