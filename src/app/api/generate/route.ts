@@ -56,7 +56,13 @@ export async function POST(request: NextRequest) {
                         console.log("params : ", params);
 
                         const data: any = await prisma.$queryRawUnsafe(`SELECT * FROM ${table.procedureName}(${params?.map((p: any, index: number) => `$${index + 1}`).join(',')});`, ...params);
-                        fullData[table.tableName] = data[0];
+
+                        if (table.isMultiRow === 1) {
+                            fullData[table.tableName] = data;
+                        } else {
+                            fullData[table.tableName] = data[0];
+                        }
+                        
 
                         console.log("fullData : ", fullData)
                     } catch (procError) {
