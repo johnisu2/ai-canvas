@@ -210,36 +210,17 @@ export async function generatePdf(
                 image = await pdfDoc.embedJpg(fileBuffer);
             }
 
-            const page = pdfDoc.addPage([canvasWidth, canvasHeight]);
-
-            // Calculate Object Contain positioning (matching Editor's object-contain)
-            const imgWidth = image.width;
-            const imgHeight = image.height;
-            const ratio = imgWidth / imgHeight;
-            const canvasRatio = canvasWidth / canvasHeight;
-
-            let drawWidth = canvasWidth;
-            let drawHeight = canvasHeight;
-            let drawX = 0;
-            let drawY = 0;
-
-            if (ratio > canvasRatio) {
-                // Width constrained - centered vertically
-                drawHeight = canvasWidth / ratio;
-                drawY = (canvasHeight - drawHeight) / 2;
-            } else {
-                // Height constrained - centered horizontally
-                drawWidth = canvasHeight * ratio;
-                drawX = (canvasWidth - drawWidth) / 2;
-            }
+            const drawWidth = canvasWidth;
+            const drawHeight = (image.height / image.width) * drawWidth;
+            const page = pdfDoc.addPage([drawWidth, drawHeight]);
 
             page.drawImage(image, {
-                x: drawX,
-                y: drawY,
+                x: 0,
+                y: 0,
                 width: drawWidth,
                 height: drawHeight
             });
-            console.log(`[PDF Gen] Embedded Image with object-contain at ${drawX},${drawY} dims ${drawWidth}x${drawHeight}`);
+            console.log(`[PDF Gen] Embedded Image with dynamic size: ${drawWidth}x${drawHeight}`);
 
         } catch (e) {
             console.error("Failed to embed background image", e);

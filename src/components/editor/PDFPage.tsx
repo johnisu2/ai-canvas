@@ -45,17 +45,27 @@ export function PDFPage({
 
             try {
                 const page = await pdfDocument.getPage(pageNumber);
-                const viewport = page.getViewport({ scale });
 
-                // Update dimensions only if changed to avoid jitter
+                // 1. Baseline viewport at scale 1.0 for CSS layout calculations
+                const baselineViewport = page.getViewport({ scale: 1.0 });
+                const baseWidth = baselineViewport.width;
+                const baseHeight = baselineViewport.height;
+
+                // 2. High-resolution scale for rendering (Fixed at 2.0 base for crispness)
+                const renderBaseScale = 2.0;
+                const dpr = window.devicePixelRatio || 1;
+                const totalScale = renderBaseScale * dpr;
+                const highResViewport = page.getViewport({ scale: totalScale });
+
+                // Update container dimensions (relative to zoom scale)
                 setDimensions(prev =>
-                    (prev.width === viewport.width && prev.height === viewport.height)
+                    (prev.width === baseWidth * scale && prev.height === baseHeight * scale)
                         ? prev
-                        : { width: viewport.width, height: viewport.height }
+                        : { width: baseWidth * scale, height: baseHeight * scale }
                 );
 
                 const canvas = canvasRef.current;
-                const context = canvas.getContext("2d");
+                const context = canvas.getContext("2d", { willReadFrequently: true });
 
                 if (context) {
                     // Cancel any existing task
@@ -67,12 +77,14 @@ export function PDFPage({
 
                     if (isCancelled) return;
 
-                    canvas.height = viewport.height;
-                    canvas.width = viewport.width;
+                    // Set canvas resolution to high-res viewport
+                    canvas.width = highResViewport.width;
+                    canvas.height = highResViewport.height;
 
                     const renderContext = {
                         canvasContext: context,
-                        viewport: viewport,
+                        viewport: highResViewport,
+                        intent: 'print' // Use print intent for higher quality font rendering
                     };
 
                     const task = page.render(renderContext);

@@ -50,6 +50,7 @@ export function CanvasEditor({ documentId, fileUrl, fileType = 'pdf', initialEle
     const [isFullScreen, setIsFullScreen] = useState(false);
     const [isFitted, setIsFitted] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [imageDimensions, setImageDimensions] = useState({ width: 800, height: 1100 });
 
     // Hooks must be at the top level
     const clipboard = useRef<CanvasElement | null>(null);
@@ -76,8 +77,8 @@ export function CanvasEditor({ documentId, fileUrl, fileType = 'pdf', initialEle
         }
 
         const containerWidth = container.clientWidth - 100;
-        const canvasWidth = 800;
-        const targetScale = containerWidth / canvasWidth;
+        const targetWidth = 800; // Use 800 as nominal width for scaling
+        const targetScale = containerWidth / targetWidth;
         const finalFitScale = Math.max(0.6, Math.min(targetScale, 1.5));
 
         if (Math.abs(scale - finalFitScale) < 0.05) {
@@ -496,7 +497,7 @@ export function CanvasEditor({ documentId, fileUrl, fileType = 'pdf', initialEle
                                 className="relative shadow-lg bg-white transition-all duration-200 ease-in-out"
                                 style={{
                                     width: '800px',
-                                    height: '1100px',
+                                    height: `${(imageDimensions.height / imageDimensions.width) * 800}px`,
                                 }}
                                 onDrop={(e) => {
                                     e.preventDefault();
@@ -514,7 +515,16 @@ export function CanvasEditor({ documentId, fileUrl, fileType = 'pdf', initialEle
                                 <img
                                     src={fileUrl}
                                     alt="Document"
-                                    className="absolute inset-0 object-contain pointer-events-none"
+                                    onLoad={(e) => {
+                                        const img = e.currentTarget;
+                                        if (img.naturalWidth && img.naturalHeight) {
+                                            setImageDimensions({
+                                                width: img.naturalWidth,
+                                                height: img.naturalHeight
+                                            });
+                                        }
+                                    }}
+                                    className="absolute inset-0 w-full h-full object-fill pointer-events-none"
                                 />
 
                                 {/* Grid Layer */}
@@ -539,7 +549,7 @@ export function CanvasEditor({ documentId, fileUrl, fileType = 'pdf', initialEle
 
 
                                 {/* Elements Layer */}
-                                <div className="absolute inset-0 w-full h-full ">
+                                <div className="absolute inset-0 w-full h-full overflow-hidden">
                                     {elements.map((el) => (
                                         <ElementRenderer
                                             key={el.id}
