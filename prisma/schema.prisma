@@ -14,6 +14,21 @@ model Document {
   fileType  String
   createdAt DateTime        @default(now())
   elements  CanvasElement[]
+  versionHistories DocumentVersionHistory[]
+}
+
+model DocumentVersionHistory {
+  id            Int      @id @default(autoincrement())
+  documentId    Int
+  versionNumber Int
+  createdAt     DateTime @default(now())
+  elements      Json
+  changeLog     String?
+
+  document      Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@unique([documentId, versionNumber])
+  @@map("document_version_histories")
 }
 
 model CanvasElement {

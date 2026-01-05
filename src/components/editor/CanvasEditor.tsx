@@ -12,13 +12,15 @@ import {
     Home,
     ChevronLeft,
     RotateCw,
-    Copy
+    Copy,
+    History as HistoryIcon
 } from "lucide-react";
 import Link from 'next/link';
 import Swal from 'sweetalert2';
 import { cn } from "@/lib/utils";
 import { Toolbox } from "./Toolbox";
 import { EditModal } from "./EditModal";
+import { HistorySidebar } from "./HistorySidebar"; // Import Sidebar
 import { v4 as uuidv4 } from "uuid";
 import { ElementType } from "@/types/canvas";
 import { ElementRenderer } from "./ElementRenderer";
@@ -34,6 +36,16 @@ interface CanvasEditorProps {
     fileType?: string; // NEW
     initialElements?: CanvasElement[];
 }
+
+// Normalizer to protect specific keys
+const normalizeElements = (elements: any[]): CanvasElement[] => {
+    return elements.map(el => ({
+        ...el,
+        // Ensure critical fields exist
+        width: el.width || el.w || 100, // Legacy support example
+        height: el.height || el.h || 50
+    }));
+};
 
 export function CanvasEditor({ documentId, fileUrl, fileType = 'pdf', initialElements = [] }: CanvasEditorProps) {
     const [pdfDocument, setPdfDocument] = useState<PDFDocumentProxy | null>(null);
@@ -51,6 +63,8 @@ export function CanvasEditor({ documentId, fileUrl, fileType = 'pdf', initialEle
     const [isFitted, setIsFitted] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [imageDimensions, setImageDimensions] = useState({ width: 800, height: 1100 });
+    const [isHistoryOpen, setIsHistoryOpen] = useState(false); // New State
+    const [elementsBackup, setElementsBackup] = useState<CanvasElement[] | null>(null);
 
     // Hooks must be at the top level
     const clipboard = useRef<CanvasElement | null>(null);
@@ -156,11 +170,24 @@ export function CanvasEditor({ documentId, fileUrl, fileType = 'pdf', initialEle
         if (!isDirty) return;
         setIsSaving(true);
         try {
-            const res = await fetch(`/api/documents/${documentId}`, {
+            // 1. Save Current (PUT)
+            const saveCurrentProm = fetch(`/api/documents/${documentId}`, {
                 method: "PUT",
                 body: JSON.stringify({ elements }),
                 headers: { "Content-Type": "application/json" }
             });
+
+            // 2. Create History Version (POST)
+            const saveHistoryProm = fetch(`/api/documents/${documentId}/versions`, {
+                method: "POST",
+                body: JSON.stringify({
+                    elements,
+                    changeLog: `Saved on ${new Date().toLocaleString('th-TH')}`
+                }),
+                headers: { "Content-Type": "application/json" }
+            });
+
+            const [res] = await Promise.all([saveCurrentProm, saveHistoryProm]);
             setIsDirty(false);
             if (res.ok) {
                 Swal.fire({
@@ -407,7 +434,7 @@ export function CanvasEditor({ documentId, fileUrl, fileType = 'pdf', initialEle
                         isDirty ? "bg-orange-500 animate-pulse scale-110" : "bg-emerald-500"
                     )} />
                     <span className="text-[10px] uppercase tracking-widest font-black text-slate-500 whitespace-nowrap">
-                        {isDirty ? "มีการเปลี่ยนแปลงที่ยังไม่ได้บันทึก" : "บันทึกข้อมูลแล้ว"}
+                        {isDirty ? "มีการเปลี่ยนแปลง" : "บันทึกแล้ว"}
                     </span>
                 </div>
 
@@ -432,6 +459,19 @@ export function CanvasEditor({ documentId, fileUrl, fileType = 'pdf', initialEle
                     </button>
 
                     <button
+                        onClick={() => setIsHistoryOpen(prev => !prev)}
+                        className={cn(
+                            "p-2 rounded-xl transition-all active:scale-95 group",
+                            isHistoryOpen
+                                ? "bg-indigo-100 text-indigo-600 shadow-inner"
+                                : "hover:bg-slate-100 text-slate-400 hover:text-slate-600"
+                        )}
+                        title="ประวัติการแก้ไข"
+                    >
+                        <HistoryIcon className="w-5 h-5" />
+                    </button>
+
+                    <button
                         onClick={handleSave}
                         disabled={!isDirty || isSaving}
                         className={cn(
@@ -446,15 +486,7 @@ export function CanvasEditor({ documentId, fileUrl, fileType = 'pdf', initialEle
                         ) : (
                             <Save className="w-4 h-4" />
                         )}
-                        <span>{isSaving ? "กำลังบันทึก..." : "บันทึกเรียบร้อย"}</span>
-                    </button>
-
-                    <button
-                        onClick={() => window.location.reload()}
-                        className="p-2 hover:bg-slate-100 text-slate-400 hover:text-slate-600 rounded-xl transition-all active:scale-95 group"
-                        title="รีเซ็ตหน้าจอ"
-                    >
-                        <RotateCw className="w-5 h-5 group-hover:rotate-180 transition-transform duration-700" />
+                        <span>{isSaving ? "บันทึก..." : "บันทึก"}</span>
                     </button>
                 </div>
             </div>
@@ -584,6 +616,48 @@ export function CanvasEditor({ documentId, fileUrl, fileType = 'pdf', initialEle
                     />
                 )
             }
+
+            <HistorySidebar
+                isOpen={isHistoryOpen}
+                onClose={() => setIsHistoryOpen(false)}
+                documentId={documentId}
+                onPreviewVersion={(previewElements, versionNumber) => {
+                    if (versionNumber === 0) {
+                        // Restore from backup
+                        if (elementsBackup) {
+                            setElements(elementsBackup);
+                            setElementsBackup(null);
+                            setIsDirty(false);
+                            Swal.fire({
+                                icon: 'info',
+                                title: 'ยกเลิกการแสดงตัวอย่าง',
+                                text: 'กลับไปที่เวอร์ชันปัจจุบัน',
+                                showConfirmButton: false,
+                                timer: 1000
+                            });
+                        }
+                        return;
+                    }
+
+                    // Store backup if not already previewing
+                    if (!elementsBackup) {
+                        setElementsBackup([...elements]);
+                    }
+
+                    const normalized = normalizeElements(previewElements);
+                    setElements(normalized);
+                    setIsDirty(true);
+
+                    Swal.fire({
+                        icon: 'info',
+                        title: `กำลังแสดงตัวอย่าง V.${versionNumber}`,
+                        text: 'กดปุ่ม "บันทึก" มุมขวาบนหากต้องการย้อนกลับไปใช้เวอร์ชันนี้',
+                        showConfirmButton: false,
+                        timer: 2500,
+                        timerProgressBar: true
+                    });
+                }}
+            />
 
         </div >
     );

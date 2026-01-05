@@ -179,16 +179,35 @@ export function EditModal({ element, isOpen, onClose, onSave, onChange, onDelete
         }
     };
 
-    // Simple file upload handler
-    const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    // Updated file upload handler (Uploads to server instead of Base64)
+    const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (file) {
-            const reader = new FileReader();
-            reader.onloadend = () => {
-                const base64 = reader.result as string;
-                handleChange("fieldValue", base64);
-            };
-            reader.readAsDataURL(file);
+            // Create FormData
+            const formData = new FormData();
+            formData.append("file", file);
+
+            try {
+                // Determine API endpoint based on type context (optional, but good for tracking)
+                const res = await fetch("/api/upload/asset", {
+                    method: "POST",
+                    body: formData
+                });
+
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data.success && data.fileUrl) {
+                        handleChange("fieldValue", data.fileUrl);
+                    } else {
+                        console.error("Upload failed:", data.error);
+                        // Fallback or Alert could be added here
+                    }
+                } else {
+                    console.error("Upload failed with status:", res.status);
+                }
+            } catch (error) {
+                console.error("Error uploading file:", error);
+            }
         }
     };
 
