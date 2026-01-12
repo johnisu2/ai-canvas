@@ -63,7 +63,7 @@ export function CanvasEditor({ documentId, fileUrl, fileType = 'pdf', initialEle
     const [isFitted, setIsFitted] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [imageDimensions, setImageDimensions] = useState({ width: 800, height: 1100 });
-    const [isHistoryOpen, setIsHistoryOpen] = useState(false); // New State
+    // const [isHistoryOpen, setIsHistoryOpen] = useState(false); // New State
     const [elementsBackup, setElementsBackup] = useState<CanvasElement[] | null>(null);
 
     // Hooks must be at the top level
@@ -177,17 +177,18 @@ export function CanvasEditor({ documentId, fileUrl, fileType = 'pdf', initialEle
                 headers: { "Content-Type": "application/json" }
             });
 
-            // 2. Create History Version (POST)
-            const saveHistoryProm = fetch(`/api/documents/${documentId}/versions`, {
-                method: "POST",
-                body: JSON.stringify({
-                    elements,
-                    changeLog: `Saved on ${new Date().toLocaleString('th-TH')}`
-                }),
-                headers: { "Content-Type": "application/json" }
-            });
+            // 2. Create History Version (POST) -- DISABLED
+            // const saveHistoryProm = fetch(`/api/documents/${documentId}/versions`, {
+            //     method: "POST",
+            //     body: JSON.stringify({
+            //         elements,
+            //         changeLog: `Saved on ${new Date().toLocaleString('th-TH')}`
+            //     }),
+            //     headers: { "Content-Type": "application/json" }
+            // });
 
-            const [res] = await Promise.all([saveCurrentProm, saveHistoryProm]);
+            // const [res] = await Promise.all([saveCurrentProm, saveHistoryProm]);
+            const [res] = await Promise.all([saveCurrentProm]);
             setIsDirty(false);
             if (res.ok) {
                 Swal.fire({
@@ -442,6 +443,15 @@ export function CanvasEditor({ documentId, fileUrl, fileType = 'pdf', initialEle
 
                 {/* Main Actions */}
                 <div className="flex items-center gap-1.5">
+
+                    <button
+                        onClick={() => window.location.reload()}
+                        className="p-2 hover:bg-slate-100 text-slate-400 hover:text-slate-600 rounded-xl transition-all active:scale-95 group"
+                        title="รีเซ็ตหน้าจอ"
+                    >
+                        <RotateCw className="w-5 h-5 group-hover:rotate-180 transition-transform duration-700" />
+                    </button>
+
                     <button
                         onClick={handleClone}
                         disabled={isCloning}
@@ -458,7 +468,7 @@ export function CanvasEditor({ documentId, fileUrl, fileType = 'pdf', initialEle
                         </span>
                     </button>
 
-                    <button
+                    {/* <button
                         onClick={() => setIsHistoryOpen(prev => !prev)}
                         className={cn(
                             "p-2 rounded-xl transition-all active:scale-95 group",
@@ -469,7 +479,8 @@ export function CanvasEditor({ documentId, fileUrl, fileType = 'pdf', initialEle
                         title="ประวัติการแก้ไข"
                     >
                         <HistoryIcon className="w-5 h-5" />
-                    </button>
+                    </button> */}
+
 
                     <button
                         onClick={handleSave}
@@ -617,7 +628,7 @@ export function CanvasEditor({ documentId, fileUrl, fileType = 'pdf', initialEle
                 )
             }
 
-            <HistorySidebar
+            {/* <HistorySidebar
                 isOpen={isHistoryOpen}
                 onClose={() => setIsHistoryOpen(false)}
                 documentId={documentId}
@@ -657,7 +668,7 @@ export function CanvasEditor({ documentId, fileUrl, fileType = 'pdf', initialEle
                         timerProgressBar: true
                     });
                 }}
-            />
+            /> */}
 
         </div >
     );
